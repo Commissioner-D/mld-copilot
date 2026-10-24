@@ -43,6 +43,18 @@ jobs:
       - name: Migrationen
         run: npx wrangler d1 migrations apply mld-copilot --remote
 
+      - name: workers.dev-Subdomain sicherstellen
+        run: |
+          CF=https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain
+          SUB=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" $CF | node -e 'console.log(JSON.parse(require("fs").readFileSync(0)).result?.subdomain||"")')
+          if [ -z "$SUB" ]; then
+            for name in commissioner-d mld-commissioner-d commissioner-d-mld; do
+              R=$(curl -s -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "{\"subdomain\":\"$name\"}" $CF)
+              echo "$name: $R"
+              echo "$R" | grep -q '"success":true' && break
+            done
+          else echo "Subdomain: $SUB"; fi
+
       - name: Deploy
         run: |
           set -o pipefail
