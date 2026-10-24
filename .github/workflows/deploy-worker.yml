@@ -50,10 +50,11 @@ jobs:
           if [ -z "$SUB" ]; then
             for name in commissioner-d mld-commissioner-d commissioner-d-mld; do
               R=$(curl -s -X PUT -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "{\"subdomain\":\"$name\"}" $CF)
-              echo "$name: $R"
-              echo "$R" | grep -q '"success":true' && break
+              echo "$name: $R" | tee -a /tmp/subdomain.txt
+              if echo "$R" | grep -q '"success":true'; then break; fi
             done
-          else echo "Subdomain: $SUB"; fi
+          else echo "Subdomain: $SUB" | tee -a /tmp/subdomain.txt; fi
+          true
 
       - name: Deploy
         run: |
@@ -90,7 +91,7 @@ jobs:
           { echo "deploy: $(date -u +%FT%TZ)"; echo "url: $URL"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
             echo "--- trades"; curl -s "$URL/api/trades" | head -c 400; echo;
             echo "--- cors"; curl -s -o /dev/null -D - -H "Origin: https://commissioner-d.github.io" "$URL/api/health" | grep -i access-control-allow-origin;
-            echo "--- deploy.log"; tail -25 ../deploy.log; } > /tmp/status/report.txt 2>&1 || true
+            echo "--- subdomain"; cat /tmp/subdomain.txt; echo "--- deploy.log"; tail -25 ../deploy.log; } > /tmp/status/report.txt 2>&1 || true
           cat /tmp/status/report.txt
           cd /tmp/status && git init -q && git checkout -q -b status && git add . \
             && git -c user.name=github-actions -c user.email=actions@github.com commit -qm "status" \
