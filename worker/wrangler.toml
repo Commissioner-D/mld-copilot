@@ -1,0 +1,21 @@
+name = "mld-copilot"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[vars]
+LEAGUE_ID = "305982"            # Sandkiste; fuer den Echtbetrieb 294292
+TRADE_HOURS = "72"
+ALLOWED_ORIGINS = "https://commissioner-d.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mld-copilot"
+database_id = "__D1_ID__"       # wird beim Deploy eingesetzt
+migrations_dir = "migrations"
+
+[triggers]
+crons = ["7 * * * *"]           # stuendlicher Trade-Check
+
+[observability]
+enabled = true

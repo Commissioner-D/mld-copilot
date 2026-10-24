@@ -1,0 +1,82 @@
+name: Deploy Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["worker/**", ".github/workflows/deploy-worker.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci
+
+      - name: D1-Datenbank sicherstellen
+        run: |
+          set -o pipefail
+          ID=$(npx wrangler d1 list --json | node -e 'const l=JSON.parse(require("fs").readFileSync(0));const d=l.find(x=>x.name==="mld-copilot");console.log(d?d.uuid:"")')
+          if [ -z "$ID" ]; then
+            npx wrangler d1 create mld-copilot
+            ID=$(npx wrangler d1 list --json | node -e 'const l=JSON.parse(require("fs").readFileSync(0));console.log(l.find(x=>x.name==="mld-copilot").uuid)')
+          fi
+          echo "D1: $ID"
+          sed -i "s/__D1_ID__/$ID/" wrangler.toml
+
+      - name: Migrationen
+        run: npx wrangler d1 migrations apply mld-copilot --remote
+
+      - name: Deploy
+        run: npx wrangler deploy 2>&1 | tee ../deploy.log
+
+      - name: Admin-Schluessel setzen
+        env:
+          KEY: ${{ secrets.COPILOT_ADMIN_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then printf '%s' "$KEY" | npx wrangler secret put ADMIN_KEY; else echo "COPILOT_ADMIN_KEY fehlt, Admin bleibt aus"; fi
+
+      - name: Worker-Adresse in die Seite schreiben
+        id: url
+        run: |
+          SUB=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | node -e 'console.log(JSON.parse(require("fs").readFileSync(0)).result?.subdomain||"")')
+          URL="https://mld-copilot.$SUB.workers.dev"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          printf '// Wird beim Deploy automatisch mit der Worker-Adresse ueberschrieben.\nwindow.MLDC_CONFIG = { api: "%s" };\n' "$URL" > ../docs/assets/config.js
+          cd ..
+          if ! git diff --quiet docs/assets/config.js; then
+            git config user.name "github-actions"; git config user.email "actions@github.com"
+            git add docs/assets/config.js && git commit -m "Worker-Adresse aktualisiert" && git pull --rebase -q && git push
+          fi
+
+      - name: Smoke-Test und Statusbericht
+        if: always()
+        run: |
+          URL="${{ steps.url.outputs.url }}"
+          mkdir -p /tmp/status
+          sleep 5
+          { echo "deploy: $(date -u +%FT%TZ)"; echo "url: $URL"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
+            echo "--- trades"; curl -s "$URL/api/trades" | head -c 400; echo;
+            echo "--- cors"; curl -s -o /dev/null -D - -H "Origin: https://commissioner-d.github.io" "$URL/api/health" | grep -i access-control-allow-origin;
+            echo "--- deploy.log"; tail -25 ../deploy.log; } > /tmp/status/report.txt 2>&1 || true
+          cat /tmp/status/report.txt
+          cd /tmp/status && git init -q && git checkout -q -b status && git add . \
+            && git -c user.name=github-actions -c user.email=actions@github.com commit -qm "status" \
+            && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" status
