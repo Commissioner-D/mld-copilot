@@ -59,7 +59,7 @@ jobs:
       - name: Deploy
         run: |
           set -o pipefail
-          npx wrangler deploy 2>&1 | tee ../deploy.log
+          npx wrangler deploy 2>&1 | tee ../deploy.log || { sleep 15; npx wrangler deploy 2>&1 | tee ../deploy.log; }
 
       - name: Admin-Schluessel setzen
         env:
