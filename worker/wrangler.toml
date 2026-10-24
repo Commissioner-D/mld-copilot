@@ -2,6 +2,7 @@ name = "mld-copilot"
 main = "src/index.js"
 compatibility_date = "2025-06-01"
 workers_dev = true
+preview_urls = false
 
 [vars]
 LEAGUE_ID = "305982"            # Sandkiste; fuer den Echtbetrieb 294292
