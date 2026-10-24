@@ -1,0 +1,24 @@
+name: Status
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/status-trigger"]
+
+permissions:
+  contents: write
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          URL=https://mld-copilot.commissioner-d.workers.dev
+          mkdir -p /tmp/status
+          { echo "check: $(date -u +%FT%TZ)"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
+            echo "--- trades"; curl -s "$URL/api/trades"; echo; } > /tmp/status/report.txt 2>&1 || true
+          cat /tmp/status/report.txt
+          cd /tmp/status && git init -q && git checkout -q -b status && git add . \
+            && git -c user.name=github-actions -c user.email=actions@github.com commit -qm "status" \
+            && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" status
