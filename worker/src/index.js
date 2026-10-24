@@ -105,6 +105,8 @@ async function syncTrades(env, { importCompletedHours } = {}) {
   }
   let added = 0, updated = 0;
   for (const tr of found) {
+    // Trades in Pruefung kommen ohne Statusfeld
+    if (!tr.status) tr.status = (review.trades || []).some(x => x.id === tr.id) ? "TRADE_STATUS_UNDER_REVIEW" : null;
     const sides = parseTrade(tr);
     if (sides.length !== 2) continue;              // Mehr-Team-Trades: vorerst nicht
     const existing = await env.DB.prepare("SELECT id, status FROM trades WHERE id = ?").bind(tr.id).first();
@@ -117,7 +119,7 @@ async function syncTrades(env, { importCompletedHours } = {}) {
     const opened = now();
     await env.DB.prepare(`INSERT INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(tr.id, L, tr.status, tr.description || null, JSON.stringify(sides), sides[0].team_id, sides[1].team_id,
+      .bind(tr.id, L, tr.status ?? null, tr.description || null, JSON.stringify(sides), sides[0].team_id, sides[1].team_id,
             opened, opened + tradeHours(env) * 3600e3).run();
     added++;
   }
@@ -369,7 +371,7 @@ async function route(req, env, ctx) {
       const opened = now();
       await env.DB.prepare(`INSERT OR IGNORE INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(tr.id, L, tr.status, tr.description || null, JSON.stringify(sides), sides[0].team_id, sides[1].team_id,
+        .bind(tr.id, L, tr.status ?? null, tr.description || null, JSON.stringify(sides), sides[0].team_id, sides[1].team_id,
               opened, opened + tradeHours(env) * 3600e3).run();
       return json({ ok: true });
     }
