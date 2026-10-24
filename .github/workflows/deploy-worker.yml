@@ -79,7 +79,7 @@ jobs:
           cd ..
           if ! git diff --quiet docs/assets/config.js; then
             git config user.name "github-actions"; git config user.email "actions@github.com"
-            git add docs/assets/config.js && git commit -m "Worker-Adresse aktualisiert" && git pull --rebase -q && git push
+            git add docs/assets/config.js && git commit -m "Worker-Adresse aktualisiert" && git pull --rebase --autostash -q && git push
           fi
 
       - name: Smoke-Test und Statusbericht
