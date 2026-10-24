@@ -219,11 +219,18 @@ async function route(req, env, ctx) {
   if (path === "/api/health") {
     let fleaflicker = null;
     if (url.searchParams.get("deep") === "1") {
-      try { const d = await flea(`FetchLeagueStandings?sport=NFL&league_id=${L}`); fleaflicker = { ok: true, league: d.league?.name }; }
+      try {
+        const d = await flea(`FetchLeagueStandings?sport=NFL&league_id=${L}`);
+        const rv = await flea(`FetchTrades?sport=NFL&league_id=${L}&filter=TRADES_UNDER_REVIEW`);
+        fleaflicker = { ok: true, league: d.league?.name,
+          under_review: (rv.trades || []).map(x => ({ id: x.id, status: x.status, description: x.description })) };
+      }
       catch (e) { fleaflicker = { ok: false, error: e.message }; }
     }
     const last = await env.DB.prepare("SELECT v FROM meta WHERE k = 'last_trade_check'").first();
+    const lastErr = await env.DB.prepare("SELECT v FROM meta WHERE k = 'last_trade_error'").first();
     return json({ ok: true, league_id: L, admin: !!env.ADMIN_KEY, last_trade_check: last ? Number(last.v) : null,
+                  last_trade_error: lastErr ? lastErr.v : null,
                   params: TRADE_PARAMS, fleaflicker });
   }
 
@@ -427,6 +434,10 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(syncTrades(env).catch(e => console.error("trade check", e)));
+    ctx.waitUntil(syncTrades(env).catch(async e => {
+      console.error("trade check", e);
+      await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('last_trade_error', ?)")
+        .bind(`${new Date().toISOString()} ${e.message}`).run();
+    }));
   },
 };
