@@ -129,7 +129,8 @@ async function syncTrades(env, { importCompletedHours } = {}) {
 
 async function tradeView(env, t, me, managers, { withComments = false } = {}) {
   const sides = JSON.parse(t.sides);
-  const participants = [t.team_a, t.team_b];
+  // Testmodus: Beteiligte werden wie alle anderen behandelt (nur fuer die Sandkiste)
+  const participants = env.TEST_MODE === "1" ? [] : [t.team_a, t.team_b];
   const voters = managers.filter(m => !participants.includes(m.team_id));
   const { results: votes } = await env.DB.prepare("SELECT manager_id, value FROM trade_votes WHERE trade_id = ?").bind(t.id).all();
   const allVoted = voters.length > 0 && voters.every(m => votes.some(v => v.manager_id === m.id));
@@ -231,7 +232,7 @@ async function route(req, env, ctx) {
     }
     const last = await env.DB.prepare("SELECT v FROM meta WHERE k = 'last_trade_check'").first();
     const lastErr = await env.DB.prepare("SELECT v FROM meta WHERE k = 'last_trade_error'").first();
-    return json({ ok: true, league_id: L, admin: !!env.ADMIN_KEY, last_trade_check: last ? Number(last.v) : null,
+    return json({ ok: true, league_id: L, admin: !!env.ADMIN_KEY, test_mode: env.TEST_MODE === "1", last_trade_check: last ? Number(last.v) : null,
                   last_trade_error: lastErr ? lastErr.v : null,
                   params: TRADE_PARAMS, fleaflicker });
   }

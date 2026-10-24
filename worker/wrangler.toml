@@ -7,6 +7,7 @@ preview_urls = false
 [vars]
 LEAGUE_ID = "305982"            # Sandkiste; fuer den Echtbetrieb 294292
 TRADE_HOURS = "72"
+TEST_MODE = "1"                 # Beteiligte duerfen mitstimmen; im Echtbetrieb "0"
 ALLOWED_ORIGINS = "https://commissioner-d.github.io"
 
 [[d1_databases]]
