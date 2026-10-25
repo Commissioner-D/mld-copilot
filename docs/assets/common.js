@@ -38,7 +38,9 @@ const STR = {
     err_already_voted: "Du hast schon abgestimmt.", err_closed: "Die Abstimmung ist beendet.",
     err_token_required: "Dein Link fehlt oder ist ungültig.", err_vote_first: "Erst abstimmen, dann kommentieren.",
     abst_open: n => `${n} offen · zählen ½`, abst_closed: n => `${n} Enthaltung${n === 1 ? "" : "en"} · zählen ½`,
-    theme: "Hell/Dunkel", lang: "Sprache", trade_poll: "Zum Trade",
+    theme: "Darstellung", lang: "Sprache", settings: "Einstellungen",
+    th_system: "Wie Gerät", th_light: "Hell", th_dark: "Dunkel",
+    logout: "Link auf diesem Gerät vergessen", logout_confirm: "Wirklich abmelden? Du brauchst danach deinen Link erneut.", trade_poll: "Zum Trade",
   },
   en: {
     trades: "Trades", polls: "Polls", admin: "Admin",
@@ -70,7 +72,9 @@ const STR = {
     err_already_voted: "You've already voted.", err_closed: "Voting has ended.",
     err_token_required: "Your link is missing or invalid.", err_vote_first: "Vote first, then comment.",
     abst_open: n => `${n} pending · count ½`, abst_closed: n => `${n} abstained · count ½`,
-    theme: "Light/Dark", lang: "Language", trade_poll: "Go to trade",
+    theme: "Appearance", lang: "Language", settings: "Settings",
+    th_system: "Match device", th_light: "Light", th_dark: "Dark",
+    logout: "Forget link on this device", logout_confirm: "Sign out? You'll need your link again afterwards.", trade_poll: "Go to trade",
   },
 };
 let LANG = store.get("mldc_lang") || ((navigator.language || "").toLowerCase().startsWith("de") ? "de" : "en");
@@ -98,17 +102,37 @@ function isDark() {
   return th ? th === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
+
 function renderToggles(el, onChange) {
-  el.innerHTML = `
-    <button class="icon-btn" id="tg-theme" title="${t("theme")}" aria-label="${t("theme")}">${isDark() ? ICON_SUN : ICON_MOON}</button>
-    <button class="icon-btn" id="tg-de" title="Deutsch" aria-label="Deutsch" aria-pressed="${LANG === "de"}">${FLAG_AT}</button>
-    <button class="icon-btn" id="tg-en" title="English" aria-label="English" aria-pressed="${LANG === "en"}">${FLAG_US}</button>`;
-  el.querySelector("#tg-theme").onclick = () => {
-    store.set("mldc_theme", isDark() ? "light" : "dark"); applyTheme(); renderToggles(el, onChange);
+  const th = store.get("mldc_theme") || "system";
+  const opt = (group, val, label, icon = "") =>
+    `<button role="menuitemradio" aria-checked="${group === "theme" ? th === val : LANG === val}" data-${group}="${val}">${icon}<span>${label}</span></button>`;
+  el.innerHTML = `<div class="settings">
+    <button class="icon-btn gear" aria-haspopup="true" aria-expanded="false" title="${t("settings")}" aria-label="${t("settings")}">${ICON_GEAR}<span class="caret">▾</span></button>
+    <div class="menu" role="menu" hidden>
+      <div class="menu-h">${t("theme")}</div>
+      ${opt("theme", "system", t("th_system"))}${opt("theme", "light", t("th_light"))}${opt("theme", "dark", t("th_dark"))}
+      <div class="menu-h">${t("lang")}</div>
+      ${opt("lang", "de", "Deutsch", FLAG_AT)}${opt("lang", "en", "English", FLAG_US)}
+      ${store.get("mldc_token") ? `<div class="menu-sep"></div><button data-logout="1"><span>${t("logout")}</span></button>` : ""}
+    </div></div>`;
+  const btn = el.querySelector(".gear"), menu = el.querySelector(".menu");
+  const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = e => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute("aria-expanded", String(!menu.hidden)); };
+  if (!window.__mldcMenu) {             // globale Listener nur einmal registrieren
+    window.__mldcMenu = true;
+    const closeAll = () => document.querySelectorAll(".settings .menu").forEach(m => { m.hidden = true; });
+    document.addEventListener("click", e => { if (!e.target.closest(".settings")) closeAll(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
+  }
+  menu.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.theme) { store.set("mldc_theme", b.dataset.theme === "system" ? null : b.dataset.theme); applyTheme(); }
+    if (b.dataset.lang) { LANG = b.dataset.lang; store.set("mldc_lang", LANG); document.documentElement.lang = LANG; onChange && onChange(); }
+    if (b.dataset.logout && confirm(t("logout_confirm"))) { store.set("mldc_token", null); location.reload(); return; }
+    renderToggles(el, onChange);
   };
-  const setLang = l => { LANG = l; store.set("mldc_lang", l); document.documentElement.lang = l; renderToggles(el, onChange); onChange && onChange(); };
-  el.querySelector("#tg-de").onclick = () => setLang("de");
-  el.querySelector("#tg-en").onclick = () => setLang("en");
 }
 
 // ---------- Helfer ----------
