@@ -49,12 +49,16 @@ function verdictHtml(r, tr) {
     head = r.level === "clear" ? t("v_clear", esc(name)) : t("v_tendency", esc(name));
     sub = `${t("strength_label")}: ${t("strength")[Math.round(r.strength)] || r.strength}`;
   }
+  const ab = r.abstentions || 0;
+  const max = Math.max(1, ...Object.entries(r.distribution).map(([v, n]) => n + (Number(v) === 0 ? ab : 0)));
+  const H = n => Math.round(70 * n / max);
   const cols = [-3, -2, -1, 0, 1, 2, 3].map(v => {
     const n = r.distribution[v] || 0;
-    const max = Math.max(1, ...Object.values(r.distribution));
     const names = r.ballots.filter(b => b.value === v).map(b => esc(b.name)).join(", ");
-    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="n">${n || ""}</div>
-      <div class="bar" style="height:${Math.round(70 * n / max)}px"></div><div class="lab">${LABELS(v)}</div><div class="names">${names}</div></div>`;
+    const abst = v === 0 && ab ? `<div class="bar abst" style="height:${H(ab)}px" title="${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}"></div>` : "";
+    const label = v === 0 && ab ? `<div class="abst-lab">${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}</div>` : "";
+    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> +${ab}</span>` : ""}</div>
+      ${abst}<div class="bar" style="height:${H(n)}px"></div><div class="lab">${LABELS(v)}</div>${label}<div class="names">${names}</div></div>`;
   }).join("");
   return `<div class="verdict ${r.side || ""}"><b>${head}</b><span class="meta">${sub}</span></div>
     <div class="scale-labels" style="margin-top:12px"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>

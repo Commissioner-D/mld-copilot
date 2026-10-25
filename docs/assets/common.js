@@ -37,6 +37,7 @@ const STR = {
     anonymous_person: "Anonym", back: "← Zurück", error: "Fehler", loading: "Lädt…",
     err_already_voted: "Du hast schon abgestimmt.", err_closed: "Die Abstimmung ist beendet.",
     err_token_required: "Dein Link fehlt oder ist ungültig.", err_vote_first: "Erst abstimmen, dann kommentieren.",
+    abst_open: n => `${n} offen · zählen ½`, abst_closed: n => `${n} Enthaltung${n === 1 ? "" : "en"} · zählen ½`,
     theme: "Hell/Dunkel", lang: "Sprache", trade_poll: "Zum Trade",
   },
   en: {
@@ -68,6 +69,7 @@ const STR = {
     anonymous_person: "Anonymous", back: "← Back", error: "Error", loading: "Loading…",
     err_already_voted: "You've already voted.", err_closed: "Voting has ended.",
     err_token_required: "Your link is missing or invalid.", err_vote_first: "Vote first, then comment.",
+    abst_open: n => `${n} pending · count ½`, abst_closed: n => `${n} abstained · count ½`,
     theme: "Light/Dark", lang: "Language", trade_poll: "Go to trade",
   },
 };
