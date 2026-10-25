@@ -9,7 +9,7 @@ const API = (window.MLDC_CONFIG && window.MLDC_CONFIG.api) || "http://localhost:
 // ---------- Sprache ----------
 const STR = {
   de: {
-    trades: "Trades", polls: "Umfragen", admin: "Admin",
+    trades: "Trades", polls: "Umfragen", admin: "Admin", info: "Info", how: "So wird ausgewertet", more_info: "Mehr dazu unter Info →",
     need_link: "<strong>Nur ansehen.</strong> Zum Abstimmen brauchst du deinen persönlichen Link vom Commish.",
     hello: "Angemeldet als", no_trades: "Noch keine Trades zur Abstimmung.", no_polls: "Noch keine Umfragen.",
     gets: "bekommt", pick: "Pick", round: "Runde", from: "von",
@@ -43,7 +43,7 @@ const STR = {
     logout: "Link auf diesem Gerät vergessen", logout_confirm: "Wirklich abmelden? Du brauchst danach deinen Link erneut.", trade_poll: "Zum Trade",
   },
   en: {
-    trades: "Trades", polls: "Polls", admin: "Admin",
+    trades: "Trades", polls: "Polls", admin: "Admin", info: "Info", how: "How this is evaluated", more_info: "More under Info →",
     need_link: "<strong>View only.</strong> To vote you need your personal link from the commish.",
     hello: "Signed in as", no_trades: "No trades up for a vote yet.", no_polls: "No polls yet.",
     gets: "gets", pick: "Pick", round: "Round", from: "from",

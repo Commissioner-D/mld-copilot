@@ -63,7 +63,8 @@ function verdictHtml(r, tr) {
   return `<div class="verdict ${r.side || ""}"><b>${head}</b><span class="meta">${sub}</span></div>
     <div class="scale-labels" style="margin-top:12px"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>
     <div class="dist">${cols}</div>
-    <div class="meta" style="margin-top:8px">${t("voted_of", r.votes, r.votes + r.abstentions)} · z = ${r.z.toFixed(2).replace(".", LANG === "de" ? "," : ".")}</div>`;
+    <div class="meta" style="margin-top:8px">${t("voted_of", r.votes, r.votes + r.abstentions)} · ${leadLine(r)}</div>
+    <details class="explain"><summary>${t("how")}</summary>${INFO[LANG].short}<a href="#/info">${t("more_info")}</a></details>`;
 }
 
 function scaleHtml(tr) {
@@ -240,7 +241,7 @@ async function refreshOpen() {
 function renderNav(active) {
   const b = k => OPEN[k] ? `<span class="badge">${OPEN[k]}</span>` : "";
   document.getElementById("tabs").innerHTML =
-    `<a href="#/trades" class="${active === "trades" ? "active" : ""}">${t("trades")}${b("trades")}</a><a href="#/polls" class="${active === "polls" ? "active" : ""}">${t("polls")}${b("polls")}</a>`;
+    `<a href="#/trades" class="${active === "trades" ? "active" : ""}">${t("trades")}${b("trades")}</a><a href="#/polls" class="${active === "polls" ? "active" : ""}">${t("polls")}${b("polls")}</a><a href="#/info" class="${active === "info" ? "active" : ""}">${t("info")}</a>`;
 }
 
 async function router() {
@@ -251,6 +252,7 @@ async function router() {
     if ((m = h.match(/^#\/trade\/(\d+)/))) { renderNav("trades"); await showTrade(m[1]); }
     else if ((m = h.match(/^#\/poll\/(\d+)/))) { renderNav("polls"); await showPoll(m[1]); }
     else if (h.startsWith("#/polls")) { renderNav("polls"); await showList("polls"); }
+    else if (h.startsWith("#/info")) { renderNav("info"); $main.innerHTML = `<div class="card info"><div class="card-body">${INFO[LANG].page()}</div></div>`; }
     else { renderNav("trades"); await showList("trades"); }
   } catch (e) {
     $main.innerHTML = `<div class="notice err">${esc(errText(e))}</div>`;
@@ -267,5 +269,5 @@ window.addEventListener("hashchange", () => { pending = null; router(); window.s
     if (!ME && store.get("mldc_token")) store.set("mldc_token", null);   // Link gesperrt oder ungueltig
   } catch { ME = null; }                                                 // Netzwerkfehler: Token behalten
   router();
-  setInterval(() => { if (!pending && !document.activeElement?.matches("textarea")) router(); }, 60000);
+  setInterval(() => { if (!pending && !document.activeElement?.matches("textarea") && !location.hash.startsWith("#/info") && !document.querySelector("details[open]")) router(); }, 60000);
 })();
