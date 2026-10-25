@@ -35,7 +35,7 @@ function statusPill(x) {
 function tradeCard(tr) {
   const mine = tr.me?.participant ? `<span class="pill mine">${t("your_trade")}</span>` :
                tr.me?.vote !== null && tr.me?.vote !== undefined ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
-  return `<div class="card"><a class="stretch" href="#/trade/${tr.id}">
+  return `<div class="card${tr.me?.can_vote ? " new" : ""}"><a class="stretch" href="#/trade/${tr.id}">
     <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
     <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
     <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}</div></div></a></div>`;
@@ -114,7 +114,7 @@ function pollInfo(p) {
 
 function pollCard(p) {
   const mine = p.me?.voted ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
-  return `<div class="card"><a class="stretch" href="#/poll/${p.id}">
+  return `<div class="card${p.me?.can_vote ? " new" : ""}"><a class="stretch" href="#/poll/${p.id}">
     <div class="card-head"><h3>${esc(p.title)}</h3><div>${mine} ${statusPill(p)}</div></div>
     <div class="card-body"><div>${pollInfo(p)}</div><div class="meta" style="margin-top:8px">${fmtDate(p.opened_at)} · ${t("voted_of", p.voted_count, p.eligible)}</div></div></a></div>`;
 }
@@ -229,13 +229,23 @@ async function showList(kind) {
     : `<div class="empty">${t(kind === "polls" ? "no_polls" : "no_trades")}</div>`);
 }
 
+let OPEN = { trades: 0, polls: 0 };
+async function refreshOpen() {
+  if (!ME) return;
+  try {
+    const [tr, po] = await Promise.all([api("GET", "/trades"), api("GET", "/polls")]);
+    OPEN = { trades: tr.filter(x => x.me?.can_vote).length, polls: po.filter(x => x.me?.can_vote).length };
+  } catch {}
+}
 function renderNav(active) {
+  const b = k => OPEN[k] ? `<span class="badge">${OPEN[k]}</span>` : "";
   document.getElementById("tabs").innerHTML =
-    `<a href="#/trades" class="${active === "trades" ? "active" : ""}">${t("trades")}</a><a href="#/polls" class="${active === "polls" ? "active" : ""}">${t("polls")}</a>`;
+    `<a href="#/trades" class="${active === "trades" ? "active" : ""}">${t("trades")}${b("trades")}</a><a href="#/polls" class="${active === "polls" ? "active" : ""}">${t("polls")}${b("polls")}</a>`;
 }
 
 async function router() {
   const h = location.hash || "#/trades";
+  await refreshOpen();
   let m;
   try {
     if ((m = h.match(/^#\/trade\/(\d+)/))) { renderNav("trades"); await showTrade(m[1]); }
