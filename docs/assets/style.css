@@ -221,5 +221,7 @@ details.explain ol { margin: 8px 0; padding-left: 20px; } details.explain li { m
 .tier.late { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
 
 /* Tragweite */
-.size { letter-spacing: 1px; color: var(--accent); cursor: help; }
+.size { display: inline-flex; gap: 3px; vertical-align: middle; cursor: help; }
+.size i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--accent); box-sizing: border-box; }
+.size i.on { background: var(--accent); }
 .verdict.interim { opacity: .85; border-style: dashed; }

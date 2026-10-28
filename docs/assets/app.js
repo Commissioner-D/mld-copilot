@@ -46,7 +46,7 @@ function sizeHtml(sz) {
   if (!sz) return "";
   const un = sz.unrated?.length ? ` <span class="meta">(${t("unrated")}: ${sz.unrated.map(esc).join(", ")})</span>` : "";
   const n = { small: 1, medium: 2, large: 3 }[sz.cls] || 0;
-  const dots = "●".repeat(n) + "○".repeat(3 - n);
+  const dots = [1, 2, 3].map(i => `<i class="${i <= n ? "on" : ""}"></i>`).join("");
   return ` · ${t("size")} <span class="size ${sz.cls}" title="${esc(t("size_" + sz.cls))}">${dots}</span>${un}`;
 }
 
