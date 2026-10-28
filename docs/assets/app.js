@@ -56,14 +56,25 @@ function statusPill(x) {
   return `<span class="pill open">${t("open")}</span>`;
 }
 
+// Knopf unten rechts: abstimmen / Zwischenstand / Ergebnis / Details
+function cardAction(href, x, canSee = true) {
+  let label, cls = "btn small";
+  if (x.me?.can_vote) { label = t("vote_now"); cls = "btn primary"; }
+  else if (x.closed) label = t("show_result");
+  else if (x.me && canSee) label = t("show_interim");
+  else label = t("details");
+  return `<a class="${cls}" href="${href}">${label}</a>`;
+}
+
 // ---------- Trades ----------
 function tradeCard(tr) {
   const mine = tr.me?.participant ? `<span class="pill mine">${t("your_trade")}</span>` :
                tr.me?.vote !== null && tr.me?.vote !== undefined ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
-  return `<div class="card${tr.me?.can_vote ? " new" : ""}"><a class="stretch" href="#/trade/${tr.id}">
+  return `<div class="card${tr.me?.can_vote ? " new" : ""}">
     <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
     <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
-    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div></div></a></div>`;
+    <div class="card-foot"><span class="meta">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</span>
+    ${cardAction(`#/trade/${tr.id}`, tr)}</div></div></div>`;
 }
 
 function verdictHtml(r, tr) {
@@ -145,9 +156,11 @@ function pollInfo(p) {
 
 function pollCard(p) {
   const mine = p.me?.voted ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
-  return `<div class="card${p.me?.can_vote ? " new" : ""}"><a class="stretch" href="#/poll/${p.id}">
+  return `<div class="card${p.me?.can_vote ? " new" : ""}">
     <div class="card-head"><h3>${esc(p.title)}</h3><div>${mine} ${statusPill(p)}</div></div>
-    <div class="card-body"><div>${pollInfo(p)}</div><div class="meta" style="margin-top:8px">${fmtDate(p.opened_at)} · ${t("voted_of", p.voted_count, p.eligible)}</div></div></a></div>`;
+    <div class="card-body"><div>${pollInfo(p)}</div>
+    <div class="card-foot"><span class="meta">${fmtDate(p.opened_at)} · ${t("voted_of", p.voted_count, p.eligible)}</span>
+    ${cardAction(`#/poll/${p.id}`, p, !!p.results)}</div></div></div>`;
 }
 
 function pollVoteHtml(p) {
