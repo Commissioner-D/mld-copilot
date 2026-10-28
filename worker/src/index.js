@@ -96,18 +96,18 @@ async function leagueCtx(env, { refresh = false } = {}) {
   if (!env.LEAGUE_DATA_URL || String(env.LEAGUE_DATA_LEAGUE) !== String(leagueId(env))) return null;
   const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'league_ctx'").first();
   let ctx = row ? JSON.parse(row.v) : null;
-  if (!refresh && ctx && now() - ctx.fetched < 3600e3) return ctx;
+  if (!refresh && ctx && ctx.v === 2 && now() - ctx.fetched < 3600e3) return ctx;
   try {
     const r = await fetch(env.LEAGUE_DATA_URL + "?t=" + now(), { cf: { cacheTtl: 0 } });
     if (!r.ok) throw new Error("league_json_" + r.status);
     const d = await r.json();
     const players = {};
     for (const t of d.teams || []) for (const p of t.roster || []) {
-      players[p.fl_id] = { age: p.age, draft: p.draft, rookie: p.rookie, pos_rank: p.pos_rank, pos: p.pos,
+      players[p.fl_id] = { name: p.name, age: p.age, draft: p.draft, rookie: p.rookie, pos_rank: p.pos_rank, pos: p.pos,
                            pts_avg: p.pts_avg, injury: p.injury, snap: p.snap_last, owner: t.name };
     }
     const teams = Object.fromEntries((d.teams || []).map(t => [t.name, { slot: t.draft_slot ?? null, pfo: t.pfo ?? null }]));
-    ctx = { fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
+    ctx = { v: 2, fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
     await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('league_ctx', ?)").bind(JSON.stringify(ctx)).run();
   } catch (e) { console.error("league ctx", e); }
   return ctx;
@@ -115,8 +115,14 @@ async function leagueCtx(env, { refresh = false } = {}) {
 
 function enrichPlayers(sides, ctx) {
   if (!ctx) return sides;
+  let byName = null;
   for (const s of sides) for (const p of s.players) {
-    const i = p.fl_id != null ? ctx.players[p.fl_id] : null;
+    let i = p.fl_id != null ? ctx.players[p.fl_id] : null;
+    if (!i && p.fl_id == null) {                       // aeltere Eintraege ohne ID: ueber Name + Position
+      byName = byName || Object.values(ctx.players).reduce((m, x) => ((m[x.name] = m[x.name] || []).push(x), m), {});
+      const c = (byName[p.name] || []).filter(x => x.pos === p.pos);
+      if (c.length === 1) i = c[0];
+    }
     if (i && !p.info) p.info = { age: i.age, draft: i.draft, rookie: i.rookie, pos_rank: i.pos_rank,
                                  pts_avg: i.pts_avg, injury: i.injury, snap: i.snap, asof: ctx.generated };
   }
