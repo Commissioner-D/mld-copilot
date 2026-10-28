@@ -77,7 +77,7 @@ function tradeCard(tr) {
                tr.me?.vote !== null && tr.me?.vote !== undefined ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
   return `<div class="card${tr.me?.can_vote ? " new" : ""}">
     <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
-    <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a", tr.league_id)}${sideHtml(tr.sides[1], "b", tr.league_id)}</div>
+    <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
     <div class="card-foot"><span class="meta">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</span>
     ${cardAction(`#/trade/${tr.id}`, tr)}</div></div></div>`;
 }
