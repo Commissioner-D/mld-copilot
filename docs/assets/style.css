@@ -228,3 +228,8 @@ details.explain ol { margin: 8px 0; padding-left: 20px; } details.explain li { m
 .card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .card-foot .btn { text-decoration: none; white-space: nowrap; }
 .card-foot a.btn:not(.primary) { color: var(--text); }
+.size { position: relative; outline: none; }
+.size[data-tip]:hover::after, .size[data-tip]:focus::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--bg, #fff); font-size: 12px; font-weight: 600; white-space: nowrap;
+  padding: 3px 8px; border-radius: 3px; pointer-events: none; z-index: 5; }
