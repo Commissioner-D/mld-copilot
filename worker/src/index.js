@@ -96,7 +96,7 @@ async function leagueCtx(env, { refresh = false } = {}) {
   if (!env.LEAGUE_DATA_URL || String(env.LEAGUE_DATA_LEAGUE) !== String(leagueId(env))) return null;
   const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'league_ctx'").first();
   let ctx = row ? JSON.parse(row.v) : null;
-  if (!refresh && ctx && ctx.v === 2 && now() - ctx.fetched < 3600e3) return ctx;
+  if (!refresh && ctx && ctx.v === 3 && now() - ctx.fetched < 3600e3) return ctx;
   try {
     const r = await fetch(env.LEAGUE_DATA_URL + "?t=" + now(), { cf: { cacheTtl: 0 } });
     if (!r.ok) throw new Error("league_json_" + r.status);
@@ -107,10 +107,40 @@ async function leagueCtx(env, { refresh = false } = {}) {
                            pts_avg: p.pts_avg, injury: p.injury, snap: p.snap_last, owner: t.name };
     }
     const teams = Object.fromEntries((d.teams || []).map(t => [t.name, { slot: t.draft_slot ?? null, pfo: t.pfo ?? null }]));
-    ctx = { v: 2, fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
+    simulateSlots(d.teams || [], teams, Number(env.SEASON_WEEKS || 17));
+    ctx = { v: 3, fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
     await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('league_ctx', ?)").bind(JSON.stringify(ctx)).run();
   } catch (e) { console.error("league ctx", e); }
   return ctx;
+}
+
+// PfO bis Saisonende simulieren (vereinfacht: reine PfO-Reihenfolge, Playoffs ignoriert).
+// Pro Restwoche: Teamschnitt +/- 14 % Wochenschwankung, dazu +/- 6 % Formdrift (Trades, Verletzungen).
+const TIER = slot => slot <= 5 ? "early" : slot <= 11 ? "mid" : "late";
+function simulateSlots(raw, teams, seasonWeeks, runs = 2000) {
+  const T = raw.filter(t => t.pfo);
+  if (!T.length) return;
+  const played = Math.max(1, ...T.map(t => (t.wins || 0) + (t.losses || 0) + (t.ties || 0)));
+  const rem = Math.max(0, seasonWeeks - played);
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random();
+                        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const slots = Object.fromEntries(T.map(t => [t.name, []]));
+  for (let r = 0; r < runs; r++) {
+    const fin = T.map(t => {
+      const mean = t.pfo / played, m = mean + gauss() * 0.06 * mean;
+      let tot = t.pfo;
+      for (let w = 0; w < rem; w++) tot += m + gauss() * 0.14 * mean;
+      return [tot, t.name];
+    }).sort((a, b) => a[0] - b[0]);
+    fin.forEach(([, n], i) => slots[n].push(i + 1));
+  }
+  for (const [n, arr] of Object.entries(slots)) {
+    arr.sort((a, b) => a - b);
+    const lo = arr[Math.floor(arr.length * 0.1)], hi = arr[Math.floor(arr.length * 0.9)];
+    const a = TIER(lo), b = TIER(hi);
+    teams[n].band = [lo, hi];
+    teams[n].tier = a === b ? a : `${a}/${b}`;
+  }
 }
 
 function enrichPlayers(sides, ctx) {
@@ -123,21 +153,20 @@ function enrichPlayers(sides, ctx) {
       const c = (byName[p.name] || []).filter(x => x.pos === p.pos);
       if (c.length === 1) i = c[0];
     }
-    if (i && !p.info) p.info = { age: i.age, draft: i.draft, rookie: i.rookie, pos_rank: i.pos_rank,
-                                 pts_avg: i.pts_avg, injury: i.injury, snap: i.snap, asof: ctx.generated };
+    if (i && !p.info) p.info = { age: i.age, rookie: i.rookie, pos_rank: i.pos_rank,
+                                 pts_avg: i.pts_avg, injury: i.injury, asof: ctx.generated };
   }
   return sides;
 }
 
-// Pick-Tendenz: nur fuer den naechsten Draft, aus der aktuellen PfO-Reihenfolge (niedrigster PfO = frueher Pick)
+// Pick-Tendenz: nur fuer den naechsten Draft, grob (frueh/mittel/spaet), aus simulierter PfO-Reihenfolge
 function pickOutlook(sides, ctx) {
   if (!ctx || !ctx.season) return sides;
   const next = ctx.season + 1;
-  const n = Object.values(ctx.teams).filter(t => t.slot).length || 16;
   for (const s of sides) for (const p of s.picks) {
     const orig = p.orig || p.from || sides.find(o => o !== s)?.team_name;   // aeltere Eintraege ohne "orig"
-    const slot = p.season === next ? ctx.teams[orig]?.slot : null;
-    p.outlook = slot ? { slot, of: n, tier: slot <= Math.round(n / 3) ? "early" : slot > n - Math.round(n / 3) ? "late" : "mid" } : null;
+    const tm = p.season === next ? ctx.teams[orig] : null;
+    p.outlook = tm?.tier ? { tier: tm.tier } : null;
   }
   return sides;
 }

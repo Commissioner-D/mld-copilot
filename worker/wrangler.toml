@@ -7,6 +7,7 @@ preview_urls = false
 [vars]
 LEAGUE_ID = "294292"            # MLD; Sandkiste waere 305982
 TRADE_HOURS = "72"
+SEASON_WEEKS = "17"             # Wochen, die fuer PfO zaehlen (inkl. Playoffs)
 TEST_MODE = "0"                 # "1" = Beteiligte duerfen mitstimmen (nur zum Testen)
 ALLOWED_ORIGINS = "https://commissioner-d.github.io"
 LEAGUE_DATA_URL = "https://raw.githubusercontent.com/Commissioner-D/mld-free-agents/data/data/league.json"
