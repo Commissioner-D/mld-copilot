@@ -66,11 +66,17 @@ function tradeCard(tr) {
 
 function verdictHtml(r, tr) {
   const name = r.side === "A" ? tr.sides[0].team_name : r.side === "B" ? tr.sides[1].team_name : null;
-  let head, sub;
-  if (r.level === "none") { head = t("v_none"); sub = t("v_none_sub"); }
-  else {
-    head = r.level === "clear" ? t("v_clear", esc(name)) : t("v_tendency", esc(name));
-    sub = `${t("strength_label")}: ${t("strength")[Math.round(r.strength)] || r.strength}`;
+  // Ein Satz: Tragweite + Urteil, z. B. "Großer Trade, klarer Vorteil für X (deutlich)."
+  let verdict, sub = "";
+  if (r.level === "none") { verdict = t("v_none"); sub = t("v_none_sub"); }
+  else verdict = (r.level === "clear" ? t("v_clear", esc(name)) : t("v_tendency", esc(name)))
+    + ` (${t("strength")[Math.round(r.strength)] || r.strength})`;
+  const size = tr.size ? t("v_trade")[tr.size.cls] : "";
+  let head = size ? `${size}, ${verdict}.` : verdict.charAt(0).toUpperCase() + verdict.slice(1) + ".";
+  const eligible = r.votes + r.abstentions;
+  if (!tr.closed) {
+    head = `${t("v_interim")}: ${head}`;
+    sub = (r.votes < eligible / 2 ? t("v_early", r.votes, eligible) : t("v_open", r.votes, eligible)) + (sub ? " " + sub : "");
   }
   const ab = r.abstentions || 0;
   const max = Math.max(1, ...Object.entries(r.distribution).map(([v, n]) => n + (Number(v) === 0 ? ab : 0)));
@@ -83,7 +89,7 @@ function verdictHtml(r, tr) {
     return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> +${ab}</span>` : ""}</div>
       ${abst}<div class="bar" style="height:${H(n)}px"></div><div class="lab">${LABELS(v)}</div>${label}<div class="names">${names}</div></div>`;
   }).join("");
-  return `<div class="verdict ${r.side || ""}"><b>${head}</b><span class="meta">${sub}</span></div>
+  return `<div class="verdict ${r.side || ""}${tr.closed ? "" : " interim"}"><b>${head}</b><span class="meta">${sub}</span></div>
     <div class="scale-labels" style="margin-top:12px"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>
     <div class="dist">${cols}</div>
     <div class="meta" style="margin-top:8px">${t("voted_of", r.votes, r.votes + r.abstentions)} · ${leadLine(r)}</div>
@@ -108,7 +114,7 @@ async function showTrade(id) {
   let html = `<a class="back" href="#/trades">${t("back")}</a><div class="card">
     <div class="card-head"><h3>${esc(tr.description || "")}</h3>${statusPill(tr)}</div><div class="card-body">
     <div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
-    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div>`;
+    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${tr.results ? "" : sizeHtml(tr.size)}</div>`;
   if (tr.me?.participant) html += `<div class="notice" style="margin:14px 0 0">${t("participant_note")}</div>`;
   if (tr.me?.can_vote) html += scaleHtml(tr);
   if (tr.results) html += verdictHtml(tr.results, tr);
