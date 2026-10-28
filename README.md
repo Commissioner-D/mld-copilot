@@ -36,5 +36,12 @@ Anonyme Stimmen werden ohne Verbindung zur Person gespeichert.
 - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`: Deploy
 - `COPILOT_ADMIN_KEY`: Passwort für die Admin-Seite
 
+## Abhängigkeit: MLD Free-Agent-Radar
+
+Spielerinfos (Alter, Positionsrang, Ø Punkte, Snaps, Verletzung) und Pick-Tendenzen (aus Points for Optimum)
+kommen aus `league.json` des Repos `mld-free-agents` (Branch `data`, alle 4 h). Nur lesend, optional:
+fehlt die Datei, läuft alles ohne diese Zusatzinfos weiter. Spielerinfos werden beim Übernehmen eines Trades eingefroren.
+Konfiguration: `LEAGUE_DATA_URL` / `LEAGUE_DATA_LEAGUE` in `worker/wrangler.toml`.
+
 Liga: `LEAGUE_ID` in `worker/wrangler.toml` (Sandkiste 305982, MLD 294292).
 Deploy-Status: Branch `status`, Datei `report.txt`.

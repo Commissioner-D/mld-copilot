@@ -17,10 +17,30 @@ const LABELS = v => v === 0 ? t("s0") : t("s" + Math.abs(v));
 
 function teamShort(name) { return name || "?"; }
 
+const num1 = x => x == null ? null : (Math.round(x * 10) / 10).toString().replace(".", LANG === "de" ? "," : ".");
+
+function playerInfo(i, pos) {
+  if (!i) return "";
+  const bits = [];
+  if (i.age) bits.push(t("age", Math.floor(i.age)));
+  if (i.rookie) bits.push("Rookie");
+  if (i.pos_rank) bits.push(esc(pos || "") + i.pos_rank);
+  if (i.pts_avg != null) bits.push(t("avg_pts", num1(i.pts_avg)));
+  if (i.snap != null) bits.push(t("snaps", Math.round(i.snap * 100)));
+  if (i.draft) bits.push(esc(i.draft));
+  const inj = i.injury ? ` <span class="inj">${esc(i.injury)}</span>` : "";
+  return `<div class="pinfo">${bits.join(" · ")}${inj}</div>`;
+}
+
+function pickOutlook(o, round) {
+  if (!o) return "";
+  return ` <span class="tier ${o.tier}" title="${esc(t("outlook_tip"))}">${t("tier_" + o.tier)} · ≈ ${round}.${String(o.slot).padStart(2, "0")}</span>`;
+}
+
 function sideHtml(s, cls) {
   const items = [
-    ...s.players.map(p => `<li>${esc(p.name)}<span class="pos">${esc(p.pos || "")}${p.team ? " · " + esc(p.team) : ""}</span></li>`),
-    ...s.picks.map(p => `<li class="pick">${esc(p.season)} ${t("round")} ${esc(p.round ?? "?")}${p.from ? ` (${t("from")} ${esc(p.from)})` : ""}</li>`),
+    ...s.players.map(p => `<li>${esc(p.name)}<span class="pos">${esc(p.pos || "")}${p.team ? " · " + esc(p.team) : ""}</span>${playerInfo(p.info, p.pos)}</li>`),
+    ...s.picks.map(p => `<li class="pick">${esc(p.season)} ${t("round")} ${esc(p.round ?? "?")}${p.from ? ` (${t("from")} ${esc(p.from)})` : ""}${pickOutlook(p.outlook, p.round)}</li>`),
   ];
   return `<div class="side ${cls}"><h4>${esc(s.team_name)}<span class="gets">${t("gets")}</span></h4><ul>${items.join("") || "<li>–</li>"}</ul></div>`;
 }

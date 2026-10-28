@@ -76,18 +76,62 @@ async function eligibleManagers(env) {
 
 // ---------- Trades ----------
 function parseTrade(tr) {
-  const pick = p => ({ season: p.season, round: p.slot?.round ?? null,
-                       from: p.originalOwner?.name || null });
   const sides = (tr.teams || []).map(x => ({
     team_id: x.team?.id, team_name: x.team?.name,
     players: (x.playersObtained || []).filter(p => p.proPlayer).map(p => ({
-      name: p.proPlayer.nameFull, pos: p.proPlayer.position, team: p.proPlayer.proTeamAbbreviation })),
-    picks: (x.picksObtained || []).map(pick),
+      fl_id: p.proPlayer.id, name: p.proPlayer.nameFull, pos: p.proPlayer.position, team: p.proPlayer.proTeamAbbreviation })),
+    picks: (x.picksObtained || []).map(p => ({ season: p.season, round: p.slot?.round ?? null,
+                                              orig: p.originalOwner?.name || null })),
   }));
-  // Picks: "from" nur zeigen, wenn nicht vom Gegenueber selbst (Standardfall)
   for (const s of sides) for (const p of s.picks) {
     const other = sides.find(o => o !== s);
-    if (other && p.from === other.team_name) p.from = null;
+    p.orig = p.orig || other?.team_name || null;          // urspruenglicher Besitzer (fuer die Pick-Tendenz)
+    p.from = other && p.orig !== other.team_name ? p.orig : null;   // nur zeigen, wenn nicht vom Gegenueber
+  }
+  return sides;
+}
+
+// ---------- Liga-Kontext aus dem Radar (league.json): Spielerinfos und PfO-Draft-Slots ----------
+async function leagueCtx(env, { refresh = false } = {}) {
+  if (!env.LEAGUE_DATA_URL || String(env.LEAGUE_DATA_LEAGUE) !== String(leagueId(env))) return null;
+  const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'league_ctx'").first();
+  let ctx = row ? JSON.parse(row.v) : null;
+  if (!refresh && ctx && now() - ctx.fetched < 3600e3) return ctx;
+  try {
+    const r = await fetch(env.LEAGUE_DATA_URL + "?t=" + now(), { cf: { cacheTtl: 0 } });
+    if (!r.ok) throw new Error("league_json_" + r.status);
+    const d = await r.json();
+    const players = {};
+    for (const t of d.teams || []) for (const p of t.roster || []) {
+      players[p.fl_id] = { age: p.age, draft: p.draft, rookie: p.rookie, pos_rank: p.pos_rank, pos: p.pos,
+                           pts_avg: p.pts_avg, injury: p.injury, snap: p.snap_last, owner: t.name };
+    }
+    const teams = Object.fromEntries((d.teams || []).map(t => [t.name, { slot: t.draft_slot ?? null, pfo: t.pfo ?? null }]));
+    ctx = { fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
+    await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('league_ctx', ?)").bind(JSON.stringify(ctx)).run();
+  } catch (e) { console.error("league ctx", e); }
+  return ctx;
+}
+
+function enrichPlayers(sides, ctx) {
+  if (!ctx) return sides;
+  for (const s of sides) for (const p of s.players) {
+    const i = p.fl_id != null ? ctx.players[p.fl_id] : null;
+    if (i && !p.info) p.info = { age: i.age, draft: i.draft, rookie: i.rookie, pos_rank: i.pos_rank,
+                                 pts_avg: i.pts_avg, injury: i.injury, snap: i.snap, asof: ctx.generated };
+  }
+  return sides;
+}
+
+// Pick-Tendenz: nur fuer den naechsten Draft, aus der aktuellen PfO-Reihenfolge (niedrigster PfO = frueher Pick)
+function pickOutlook(sides, ctx) {
+  if (!ctx || !ctx.season) return sides;
+  const next = ctx.season + 1;
+  const n = Object.values(ctx.teams).filter(t => t.slot).length || 16;
+  for (const s of sides) for (const p of s.picks) {
+    const orig = p.orig || p.from || sides.find(o => o !== s)?.team_name;   // aeltere Eintraege ohne "orig"
+    const slot = p.season === next ? ctx.teams[orig]?.slot : null;
+    p.outlook = slot ? { slot, of: n, tier: slot <= Math.round(n / 3) ? "early" : slot > n - Math.round(n / 3) ? "late" : "mid" } : null;
   }
   return sides;
 }
@@ -104,10 +148,11 @@ async function syncTrades(env, { importCompletedHours } = {}) {
     if (t >= cutoff) found.push(tr);
   }
   let added = 0, updated = 0;
+  const ctx = found.length ? await leagueCtx(env) : null;
   for (const tr of found) {
     // Trades in Pruefung kommen ohne Statusfeld
     if (!tr.status) tr.status = (review.trades || []).some(x => x.id === tr.id) ? "TRADE_STATUS_UNDER_REVIEW" : null;
-    const sides = parseTrade(tr);
+    const sides = enrichPlayers(parseTrade(tr), ctx);
     if (sides.length !== 2) continue;              // Mehr-Team-Trades: vorerst nicht
     const existing = await env.DB.prepare("SELECT id, status FROM trades WHERE id = ?").bind(tr.id).first();
     if (existing) {
@@ -127,8 +172,8 @@ async function syncTrades(env, { importCompletedHours } = {}) {
   return { added, updated, seen: found.length };
 }
 
-async function tradeView(env, t, me, managers, { withComments = false } = {}) {
-  const sides = JSON.parse(t.sides);
+async function tradeView(env, t, me, managers, { withComments = false, ctx = null } = {}) {
+  const sides = pickOutlook(enrichPlayers(JSON.parse(t.sides), ctx), ctx);
   // Testmodus: Beteiligte werden wie alle anderen behandelt (nur fuer die Sandkiste)
   const participants = env.TEST_MODE === "1" ? [] : [t.team_a, t.team_b];
   const voters = managers.filter(m => !participants.includes(m.team_id));
@@ -245,12 +290,13 @@ async function route(req, env, ctx) {
 
   if (path === "/api/trades" && M === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM trades WHERE league_id = ? AND hidden = 0 ORDER BY opened_at DESC LIMIT 50").bind(L).all();
-    return json(await Promise.all(results.map(t => tradeView(env, t, me, managers))));
+    const ctx = await leagueCtx(env);
+    return json(await Promise.all(results.map(t => tradeView(env, t, me, managers, { ctx }))));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)$/)) && M === "GET") {
     const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0").bind(Number(m[1]), L).first();
     if (!t) throw new HttpError(404, "not_found");
-    return json(await tradeView(env, t, me, managers, { withComments: true }));
+    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env) }));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)\/vote$/)) && M === "POST") {
     if (!me) throw new HttpError(401, "token_required");
@@ -264,7 +310,7 @@ async function route(req, env, ctx) {
     if (!Number.isInteger(value) || value < -3 || value > 3) throw new HttpError(400, "invalid_value");
     await env.DB.prepare("INSERT INTO trade_votes (trade_id, manager_id, value, created_at) VALUES (?, ?, ?, ?)")
       .bind(t.id, me.id, value, now()).run();
-    return json(await tradeView(env, t, me, managers, { withComments: true }));
+    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env) }));
   }
 
   if (path === "/api/polls" && M === "GET") {
@@ -368,7 +414,7 @@ async function route(req, env, ctx) {
       const d = await flea(`FetchTrades?sport=NFL&league_id=${L}&filter=TRADES_COMPLETED`);
       const tr = (d.trades || []).find(x => x.id === Number(id));
       if (!tr) throw new HttpError(404, "not_found");
-      const sides = parseTrade(tr);
+      const sides = enrichPlayers(parseTrade(tr), await leagueCtx(env));
       const opened = now();
       await env.DB.prepare(`INSERT OR IGNORE INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -437,7 +483,7 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(syncTrades(env).catch(async e => {
+    ctx.waitUntil(leagueCtx(env, { refresh: true }).then(() => syncTrades(env)).catch(async e => {
       console.error("trade check", e);
       await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('last_trade_error', ?)")
         .bind(`${new Date().toISOString()} ${e.message}`).run();

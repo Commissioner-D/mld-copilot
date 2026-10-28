@@ -9,6 +9,8 @@ LEAGUE_ID = "294292"            # MLD; Sandkiste waere 305982
 TRADE_HOURS = "72"
 TEST_MODE = "0"                 # "1" = Beteiligte duerfen mitstimmen (nur zum Testen)
 ALLOWED_ORIGINS = "https://commissioner-d.github.io"
+LEAGUE_DATA_URL = "https://raw.githubusercontent.com/Commissioner-D/mld-free-agents/data/data/league.json"
+LEAGUE_DATA_LEAGUE = "294292"    # league.json gilt nur fuer die MLD
 
 [[d1_databases]]
 binding = "DB"
