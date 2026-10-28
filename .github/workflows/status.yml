@@ -17,7 +17,9 @@ jobs:
           URL=https://mld-copilot.commissioner-d.workers.dev
           mkdir -p /tmp/status
           { echo "check: $(date -u +%FT%TZ)"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
-            echo "--- trades"; curl -s "$URL/api/trades"; echo; } > /tmp/status/report.txt 2>&1 || true
+            echo "--- trades"; curl -s "$URL/api/trades" | head -c 300; echo; } > /tmp/status/report.txt 2>&1 || true
+          curl -s -A "Mozilla/5.0" "https://www.fleaflicker.com/nfl/leagues/294292/leaders" -o /tmp/status/leaders.html || true
+          curl -s -A "Mozilla/5.0" "https://www.fleaflicker.com/nfl/leagues/294292/leaders?sortMode=8" -o /tmp/status/leaders8.html || true
           cat /tmp/status/report.txt
           cd /tmp/status && git init -q && git checkout -q -b status && git add . \
             && git -c user.name=github-actions -c user.email=actions@github.com commit -qm "status" \
