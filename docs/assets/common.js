@@ -77,6 +77,7 @@ const STR = {
     err_token_required: "Your link is missing or invalid.", err_vote_first: "Vote first, then comment.",
     age: n => `${n} yrs`, pos_rank: n => `pos #${n}`, avg_pts: x => `avg ${x} pts`, snaps: n => `${n}% snaps`,
     tier_early: "early", tier_mid: "middle", tier_late: "late",
+    size: "Size", size_small: "small", size_medium: "medium", size_large: "big", unrated: "not rated",
     outlook_tip: "Projection from current Points for Optimum (lowest PfO = earliest pick)",
     abst_open: n => `${n} pending · count ½`, abst_closed: n => `${n} abstained · count ½`,
     theme: "Appearance", lang: "Language", settings: "Settings",
