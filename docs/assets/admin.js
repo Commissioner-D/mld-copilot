@@ -2,7 +2,7 @@
 const A = {
   de: {
     title: "Admin", key: "Admin-Schlüssel", login: "Anmelden", logout: "Abmelden", wrong: "Schlüssel falsch.",
-    managers: "Manager & Links", sync: "Teams von Fleaflicker holen", team: "Team", owner: "Name", active: "aktiv",
+    managers: "Manager & Links", sync: "Teams von Fleaflicker holen", team: "Team", owner: "Name", phone: "Handy", phone_bad: "Nummer ungültig", active: "aktiv",
     link: "Link", new_link: "Neuer Link", link_note: "Nur jetzt sichtbar. Ein neuer Link macht den alten ungültig.",
     copy: "Kopieren", copied: "Kopiert", whatsapp: "Per WhatsApp", save: "Speichern",
     msg: (name, link) => `Servus ${name}! Dein persönlicher Link für den MLD-Copilot (Trade-Abstimmungen & Umfragen). Nicht weitergeben:\n${link}`,
@@ -21,7 +21,7 @@ const A = {
   },
   en: {
     title: "Admin", key: "Admin key", login: "Sign in", logout: "Sign out", wrong: "Wrong key.",
-    managers: "Managers & links", sync: "Pull teams from Fleaflicker", team: "Team", owner: "Name", active: "active",
+    managers: "Managers & links", sync: "Pull teams from Fleaflicker", team: "Team", owner: "Name", phone: "Mobile", phone_bad: "Invalid number", active: "active",
     link: "Link", new_link: "New link", link_note: "Shown only now. A new link invalidates the old one.",
     copy: "Copy", copied: "Copied", whatsapp: "Via WhatsApp", save: "Save",
     msg: (name, link) => `Hey ${name}! Your personal MLD-Copilot link (trade votes & polls). Don't share it:\n${link}`,
@@ -64,12 +64,13 @@ async function render() {
   <div style="text-align:right;margin-bottom:8px"><button class="btn small" id="logout">${a("logout")}</button></div>
 
   <div class="card"><div class="card-head"><h3>${a("managers")}</h3><button class="btn small" id="sync">${a("sync")}</button></div>
-  <div class="card-body"><div class="table-wrap"><table><tr><th>${a("team")}</th><th>${a("owner")}</th><th>${a("active")}</th><th>${a("link")}</th></tr>
+  <div class="card-body"><div class="table-wrap"><table><tr><th>${a("team")}</th><th>${a("owner")}</th><th>${a("phone")}</th><th>${a("active")}</th><th>${a("link")}</th></tr>
   ${mgrs.map(m => `<tr data-id="${m.id}"><td>${esc(m.team_name)}</td>
     <td><input type="text" value="${esc(m.owner_name || "")}" data-owner></td>
+    <td><input type="tel" value="${m.phone ? "+" + esc(m.phone) : ""}" placeholder="0664…" data-phone style="width:9.5em"></td>
     <td><input type="checkbox" data-active ${m.active ? "checked" : ""}></td>
     <td><button class="btn small" data-link>${m.has_token ? "↻ " : ""}${a("new_link")}</button></td></tr>
-    <tr class="linkrow" data-for="${m.id}" hidden><td colspan="4"></td></tr>`).join("") || `<tr><td colspan="4">${a("none")}</td></tr>`}
+    <tr class="linkrow" data-for="${m.id}" hidden><td colspan="5"></td></tr>`).join("") || `<tr><td colspan="5">${a("none")}</td></tr>`}
   </table></div></div></div>
 
   <div class="card"><div class="card-head"><h3>${a("trades")}</h3><button class="btn small" id="check">${a("check")}</button></div>
@@ -110,6 +111,12 @@ async function render() {
   document.querySelectorAll("tr[data-id]").forEach(row => {
     const id = row.dataset.id;
     row.querySelector("[data-owner]").onchange = e => adm("POST", `/managers/${id}`, { owner_name: e.target.value });
+    row.querySelector("[data-phone]").onchange = async e => {
+      const el = e.target;
+      try { const r = await adm("POST", `/managers/${id}`, { phone: el.value }); el.value = r.phone ? "+" + r.phone : ""; el.dataset.ok = r.phone || ""; el.title = ""; el.style.outline = ""; }
+      catch { el.title = a("phone_bad"); el.style.outline = "2px solid #c33"; }
+    };
+    row.querySelector("[data-phone]").dataset.ok = (mgrs.find(x => String(x.id) === id) || {}).phone || "";
     row.querySelector("[data-active]").onchange = e => adm("POST", `/managers/${id}`, { active: e.target.checked });
     row.querySelector("[data-link]").onclick = async () => {
       const { token } = await adm("POST", `/managers/${id}/token`);
@@ -118,7 +125,7 @@ async function render() {
       const lr = document.querySelector(`tr.linkrow[data-for="${id}"]`); lr.hidden = false;
       lr.firstElementChild.innerHTML = `<div class="meta">${a("link_note")}</div><div class="linkbox">${esc(link)}</div>
         <button class="btn small" data-copy>${a("copy")}</button>
-        <a class="btn small" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(a("msg")(name, link))}">${a("whatsapp")}</a>`;
+        <a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${row.querySelector("[data-phone]").dataset.ok}?text=${encodeURIComponent(a("msg")(name, link))}">${a("whatsapp")}</a>`;
       lr.querySelector("[data-copy]").onclick = async e => { await navigator.clipboard.writeText(link); e.target.textContent = a("copied"); };
     };
   });

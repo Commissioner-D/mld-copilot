@@ -207,6 +207,17 @@ async function syncTrades(env, { importCompletedHours } = {}) {
   return { added, updated, seen: found.length };
 }
 
+// Telefonnummer -> internationale Ziffern fuer wa.me (AT-Standard: 0664… -> 43664…). "" = loeschen, false = ungueltig
+function normPhone(v) {
+  let x = String(v ?? "").trim();
+  if (!x) return null;
+  x = x.replace(/[\s\-\/().]/g, "");
+  if (x.startsWith("+")) x = x.slice(1);
+  else if (x.startsWith("00")) x = x.slice(2);
+  else if (x.startsWith("0")) x = "43" + x.slice(1);
+  return /^\d{8,15}$/.test(x) ? x : false;
+}
+
 async function tradeView(env, t, me, managers, { withComments = false, ctx = null } = {}) {
   const sides = pickOutlook(enrichPlayers(JSON.parse(t.sides), ctx), ctx);
   // Testmodus: Beteiligte werden wie alle anderen behandelt (nur fuer die Sandkiste)
@@ -409,7 +420,7 @@ async function route(req, env, ctx) {
 
     if (a === "/managers" && M === "GET") {
       const { results } = await env.DB.prepare(
-        "SELECT id, team_id, team_name, owner_name, active, token_hash IS NOT NULL AS has_token FROM managers WHERE league_id = ? ORDER BY team_name").bind(L).all();
+        "SELECT id, team_id, team_name, owner_name, phone, active, token_hash IS NOT NULL AS has_token FROM managers WHERE league_id = ? ORDER BY team_name").bind(L).all();
       return json(results);
     }
     if (a === "/managers/sync" && M === "POST") {
@@ -431,7 +442,13 @@ async function route(req, env, ctx) {
       return json({ token: tok });   // nur einmal sichtbar
     }
     if ((m = a.match(/^\/managers\/(\d+)$/)) && M === "POST") {
-      const { active, owner_name } = await body(req);
+      const { active, owner_name, phone } = await body(req);
+      if (phone !== undefined) {
+        const p = normPhone(phone);
+        if (p === false) throw new HttpError(400, "bad_phone");
+        await env.DB.prepare("UPDATE managers SET phone = ? WHERE id = ? AND league_id = ?").bind(p, Number(m[1]), L).run();
+        return json({ ok: true, phone: p });
+      }
       if (active !== undefined) await env.DB.prepare("UPDATE managers SET active = ? WHERE id = ?").bind(active ? 1 : 0, Number(m[1])).run();
       if (owner_name !== undefined) await env.DB.prepare("UPDATE managers SET owner_name = ? WHERE id = ?").bind(String(owner_name).slice(0, 60), Number(m[1])).run();
       return json({ ok: true });
