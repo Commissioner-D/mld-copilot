@@ -1,0 +1,31 @@
+name: Trade-Werte
+
+on:
+  schedule:
+    - cron: "17 11 * * 3"     # mittwochs nach dem FantasyPros-Update im Calculator
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [tools/build_values.py, .github/workflows/values.yml]
+
+permissions:
+  contents: write
+
+concurrency: values
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: mkdir -p data && python tools/build_values.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898732+github-actions[bot]@users.noreply.github.com"
+          git add data/values.json
+          git diff --cached --quiet && { echo "unveraendert"; exit 0; }
+          git commit -m "Trade-Werte aktualisiert"
+          git pull --rebase --autostash && git push

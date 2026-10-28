@@ -39,6 +39,7 @@ const STR = {
     err_token_required: "Dein Link fehlt oder ist ungültig.", err_vote_first: "Erst abstimmen, dann kommentieren.",
     age: n => `${n} J.`, pos_rank: n => `#${n} Pos.`, avg_pts: x => `Ø ${x} Pkt`, snaps: n => `${n} % Snaps`,
     tier_early: "früh", tier_mid: "mittel", tier_late: "spät",
+    size: "Tragweite", size_small: "klein", size_medium: "mittel", size_large: "groß", unrated: "nicht bewertet",
     outlook_tip: "Prognose nach aktuellem Points for Optimum (niedrigster PfO = frühester Pick)",
     abst_open: n => `${n} offen · zählen ½`, abst_closed: n => `${n} Enthaltung${n === 1 ? "" : "en"} · zählen ½`,
     theme: "Darstellung", lang: "Sprache", settings: "Einstellungen",

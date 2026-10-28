@@ -4,7 +4,7 @@ const A = {
     title: "Admin", key: "Admin-Schlüssel", login: "Anmelden", logout: "Abmelden", wrong: "Schlüssel falsch.",
     managers: "Manager & Links", sync: "Teams von Fleaflicker holen", team: "Team", owner: "Name", phone: "Handy", phone_bad: "Nummer ungültig", active: "aktiv",
     link: "Link", new_link: "Neuer Link", link_note: "Nur jetzt sichtbar. Ein neuer Link macht den alten ungültig.",
-    copy: "Kopieren", copied: "Kopiert", whatsapp: "Per WhatsApp", save: "Speichern",
+    size: "Tragweite", resize: "Tragweite neu", resize_t: "Mit aktuellen Werten neu berechnen", copy: "Kopieren", copied: "Kopiert", whatsapp: "Per WhatsApp", save: "Speichern",
     msg: (name, link) => `Servus ${name}! Dein persönlicher Link für den MLD-Copilot (Trade-Abstimmungen & Umfragen). Nicht weitergeben:\n${link}`,
     trades: "Trades", check: "Jetzt auf neue Trades prüfen", checked: r => `${r.added} neu, ${r.updated} aktualisiert`,
     recent: "Abgeschlossene Trades aus Fleaflicker", import: "Zur Abstimmung", imported: "übernommen",
@@ -23,7 +23,7 @@ const A = {
     title: "Admin", key: "Admin key", login: "Sign in", logout: "Sign out", wrong: "Wrong key.",
     managers: "Managers & links", sync: "Pull teams from Fleaflicker", team: "Team", owner: "Name", phone: "Mobile", phone_bad: "Invalid number", active: "active",
     link: "Link", new_link: "New link", link_note: "Shown only now. A new link invalidates the old one.",
-    copy: "Copy", copied: "Copied", whatsapp: "Via WhatsApp", save: "Save",
+    size: "Size", resize: "Recalc size", resize_t: "Recalculate with current values", copy: "Copy", copied: "Copied", whatsapp: "Via WhatsApp", save: "Save",
     msg: (name, link) => `Hey ${name}! Your personal MLD-Copilot link (trade votes & polls). Don't share it:\n${link}`,
     trades: "Trades", check: "Check for new trades now", checked: r => `${r.added} new, ${r.updated} updated`,
     recent: "Completed trades from Fleaflicker", import: "Open vote", imported: "imported",
@@ -75,9 +75,10 @@ async function render() {
 
   <div class="card"><div class="card-head"><h3>${a("trades")}</h3><button class="btn small" id="check">${a("check")}</button></div>
   <div class="card-body"><div class="meta" id="checkres"></div>
-  <div class="table-wrap"><table>${trades.map(tr => `<tr data-tid="${tr.id}"><td>${esc(tr.description || tr.id)}<div class="meta">${fmtDate(tr.opened_at)} · ${tr.voted} ${a("votes")} · ${tr.closed_at || Date.now() > tr.closes_at ? a("closed") : countdown(tr.closes_at)}</div></td>
+  <div class="table-wrap"><table>${trades.map(tr => `<tr data-tid="${tr.id}"><td>${esc(tr.description || tr.id)}<div class="meta">${fmtDate(tr.opened_at)} · ${tr.voted} ${a("votes")} · ${tr.size ? `${a("size")} ${tr.size.v.toFixed(2)} (${tr.size.sides.map(x => x.toFixed(2)).join(" / ")})${tr.size.unrated.length ? " · ? " + esc(tr.size.unrated.join(", ")) : ""} · ` : ""}${tr.closed_at || Date.now() > tr.closes_at ? a("closed") : countdown(tr.closes_at)}</div></td>
     <td style="white-space:nowrap"><button class="btn small" data-act="extend">${a("extend")}</button>
     <button class="btn small" data-act="close">${a("close")}</button>
+    <button class="btn small" data-act="resize" title="${a("resize_t")}">${a("resize")}</button>
     <button class="btn small" data-act="hide" data-h="${tr.hidden ? 0 : 1}">${tr.hidden ? a("show") : a("hide")}</button></td></tr>`).join("") || `<tr><td>${a("none")}</td></tr>`}</table></div>
   <details style="margin-top:12px"><summary>${a("recent")}</summary><div id="recent" class="meta">…</div></details></div></div>
 
@@ -135,7 +136,7 @@ async function render() {
   };
   document.querySelectorAll("tr[data-tid] button").forEach(b => b.onclick = async () => {
     const id = b.closest("tr").dataset.tid, act = b.dataset.act;
-    await adm("POST", `/trades/${id}`, act === "extend" ? { extend_hours: 24 } : act === "close" ? { close: true } : { hidden: b.dataset.h === "1" });
+    await adm("POST", `/trades/${id}`, act === "extend" ? { extend_hours: 24 } : act === "close" ? { close: true } : act === "resize" ? { resize: true } : { hidden: b.dataset.h === "1" });
     render();
   });
   document.querySelector("details").ontoggle = async e => {

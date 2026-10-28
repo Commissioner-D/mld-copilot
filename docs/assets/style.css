@@ -219,3 +219,7 @@ details.explain ol { margin: 8px 0; padding-left: 20px; } details.explain li { m
 .tier.early { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
 .tier.mid { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
 .tier.late { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+
+/* Tragweite */
+.size { font-weight: 600; }
+.size.large { color: var(--accent, #e8890c); }

@@ -42,6 +42,12 @@ function sideHtml(s, cls) {
   return `<div class="side ${cls}"><h4>${esc(s.team_name)}<span class="gets">${t("gets")}</span></h4><ul>${items.join("") || "<li>–</li>"}</ul></div>`;
 }
 
+function sizeHtml(sz) {
+  if (!sz) return "";
+  const un = sz.unrated?.length ? ` <span class="meta">(${t("unrated")}: ${sz.unrated.map(esc).join(", ")})</span>` : "";
+  return ` · ${t("size")}: <span class="size ${sz.cls}">${t("size_" + sz.cls)}</span>${un}`;
+}
+
 function statusPill(x) {
   if (x.closed) return `<span class="pill">${t("closed")}</span>`;
   if (x.closes_at) return `<span class="pill open">${countdown(x.closes_at)}</span>`;
@@ -55,7 +61,7 @@ function tradeCard(tr) {
   return `<div class="card${tr.me?.can_vote ? " new" : ""}"><a class="stretch" href="#/trade/${tr.id}">
     <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
     <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
-    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}</div></div></a></div>`;
+    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div></div></a></div>`;
 }
 
 function verdictHtml(r, tr) {
@@ -102,7 +108,7 @@ async function showTrade(id) {
   let html = `<a class="back" href="#/trades">${t("back")}</a><div class="card">
     <div class="card-head"><h3>${esc(tr.description || "")}</h3>${statusPill(tr)}</div><div class="card-body">
     <div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
-    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}</div>`;
+    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div>`;
   if (tr.me?.participant) html += `<div class="notice" style="margin:14px 0 0">${t("participant_note")}</div>`;
   if (tr.me?.can_vote) html += scaleHtml(tr);
   if (tr.results) html += verdictHtml(tr.results, tr);

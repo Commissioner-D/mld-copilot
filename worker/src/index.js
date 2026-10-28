@@ -171,6 +171,57 @@ function pickOutlook(sides, ctx) {
   return sides;
 }
 
+// ---------- Tragweite (Groesse) eines Trades ----------
+// Werte aus data/values.json (wöchentlich, tools/build_values.py). 1,0 = früher 1st.
+async function getValues(env) {
+  if (!env.VALUES_URL) return null;
+  const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'values'").first();
+  let vals = row ? JSON.parse(row.v) : null;
+  if (vals && now() - vals._fetched < 12 * 3600e3) return vals;
+  try {
+    const r = await fetch(env.VALUES_URL + "?t=" + now(), { cf: { cacheTtl: 0 } });
+    if (!r.ok) throw new Error("values_" + r.status);
+    vals = { ...(await r.json()), _fetched: now() };
+    await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('values', ?)").bind(JSON.stringify(vals)).run();
+  } catch (e) { console.error("values", e); }
+  return vals;
+}
+
+const normName = n => n.toLowerCase().replace(/\./g, "").replace(/\b(jr|sr|ii|iii|iv|v)\b/g, "").replace(/[^a-z]/g, "");
+
+function playerValue(vals, p) {
+  const k = normName(p.name || "");
+  const hit = vals.players[`${k}|${p.pos}`];
+  if (hit) return hit.v;
+  const any = Object.keys(vals.players).filter(x => x.startsWith(k + "|"));
+  return any.length === 1 ? vals.players[any[0]].v : null;      // Positionswechsel (z. B. EDR/LB)
+}
+
+function pickValue(vals, p) {
+  const r = vals.picks[String(p.round)];
+  if (!r) return 0;
+  const tier = p.outlook?.tier;                                  // nur fuer den naechsten Draft gesetzt
+  if (!tier) return r.avg;
+  const parts = tier.split("/").map(x => r[x]).filter(x => x != null);
+  return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : r.avg;
+}
+
+function tradeSize(sides, vals) {
+  const unrated = [];
+  const per = sides.map(s => {
+    let v = 0;
+    for (const p of s.players) {
+      const x = playerValue(vals, p);
+      if (x == null) unrated.push(p.name); else v += x;
+    }
+    for (const p of s.picks) v += pickValue(vals, p);
+    return Math.round(v * 100) / 100;
+  });
+  const v = Math.max(...per);
+  const [t1, t2] = vals.thresholds || [0.3, 1.0];
+  return { v, sides: per, cls: v >= t2 ? "large" : v >= t1 ? "medium" : "small", unrated, asof: vals.generated_utc };
+}
+
 async function syncTrades(env, { importCompletedHours } = {}) {
   const L = leagueId(env);
   const found = [];
@@ -184,6 +235,7 @@ async function syncTrades(env, { importCompletedHours } = {}) {
   }
   let added = 0, updated = 0;
   const ctx = found.length ? await leagueCtx(env) : null;
+  const vals = found.length ? await getValues(env) : null;
   for (const tr of found) {
     // Trades in Pruefung kommen ohne Statusfeld
     if (!tr.status) tr.status = (review.trades || []).some(x => x.id === tr.id) ? "TRADE_STATUS_UNDER_REVIEW" : null;
@@ -197,10 +249,11 @@ async function syncTrades(env, { importCompletedHours } = {}) {
       continue;
     }
     const opened = now();
-    await env.DB.prepare(`INSERT INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    const size = vals?.players ? JSON.stringify(tradeSize(pickOutlook(JSON.parse(JSON.stringify(sides)), ctx), vals)) : null;
+    await env.DB.prepare(`INSERT INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at, size)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(tr.id, L, tr.status ?? null, tr.description || null, JSON.stringify(sides), sides[0].team_id, sides[1].team_id,
-            opened, opened + tradeHours(env) * 3600e3).run();
+            opened, opened + tradeHours(env) * 3600e3, size).run();
     added++;
   }
   await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('last_trade_check', ?)").bind(String(now())).run();
@@ -218,8 +271,13 @@ function normPhone(v) {
   return /^\d{8,15}$/.test(x) ? x : false;
 }
 
-async function tradeView(env, t, me, managers, { withComments = false, ctx = null } = {}) {
+async function tradeView(env, t, me, managers, { withComments = false, ctx = null, vals = null } = {}) {
   const sides = pickOutlook(enrichPlayers(JSON.parse(t.sides), ctx), ctx);
+  if (!t.size && vals?.players) {                    // einmal berechnen und einfrieren
+    t.size = JSON.stringify(tradeSize(sides, vals));
+    await env.DB.prepare("UPDATE trades SET size = ? WHERE id = ?").bind(t.size, t.id).run();
+  }
+  const size = t.size ? JSON.parse(t.size) : null;
   // Testmodus: Beteiligte werden wie alle anderen behandelt (nur fuer die Sandkiste)
   const participants = env.TEST_MODE === "1" ? [] : [t.team_a, t.team_b];
   const voters = managers.filter(m => !participants.includes(m.team_id));
@@ -235,6 +293,7 @@ async function tradeView(env, t, me, managers, { withComments = false, ctx = nul
   const canSee = !!me && (isParticipant || !!myVote || closed);
   const view = {
     id: t.id, status: t.status, description: t.description, sides,
+    size: size ? { cls: size.cls, unrated: size.unrated } : null,      // Zahlen nur im Admin
     opened_at: t.opened_at, closes_at: t.closes_at, closed, closed_at: t.closed_at,
     eligible: voters.length, voted: votes.length,
     me: me ? { participant: isParticipant, vote: myVote ? myVote.value : null,
@@ -336,13 +395,13 @@ async function route(req, env, ctx) {
 
   if (path === "/api/trades" && M === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM trades WHERE league_id = ? AND hidden = 0 ORDER BY opened_at DESC LIMIT 50").bind(L).all();
-    const ctx = await leagueCtx(env);
-    return json(await Promise.all(results.map(t => tradeView(env, t, me, managers, { ctx }))));
+    const ctx = await leagueCtx(env), vals = await getValues(env);
+    return json(await Promise.all(results.map(t => tradeView(env, t, me, managers, { ctx, vals }))));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)$/)) && M === "GET") {
     const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0").bind(Number(m[1]), L).first();
     if (!t) throw new HttpError(404, "not_found");
-    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env) }));
+    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env), vals: await getValues(env) }));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)\/vote$/)) && M === "POST") {
     if (!me) throw new HttpError(401, "token_required");
@@ -356,7 +415,7 @@ async function route(req, env, ctx) {
     if (!Number.isInteger(value) || value < -3 || value > 3) throw new HttpError(400, "invalid_value");
     await env.DB.prepare("INSERT INTO trade_votes (trade_id, manager_id, value, created_at) VALUES (?, ?, ?, ?)")
       .bind(t.id, me.id, value, now()).run();
-    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env) }));
+    return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env), vals: await getValues(env) }));
   }
 
   if (path === "/api/polls" && M === "GET") {
@@ -475,7 +534,8 @@ async function route(req, env, ctx) {
       return json({ ok: true });
     }
     if ((m = a.match(/^\/trades\/(\d+)$/)) && M === "POST") {
-      const { hidden, extend_hours, close } = await body(req);
+      const { hidden, extend_hours, close, resize } = await body(req);
+      if (resize) await env.DB.prepare("UPDATE trades SET size = NULL WHERE id = ?").bind(id).run();   // beim naechsten Anzeigen neu
       const id = Number(m[1]);
       if (hidden !== undefined) await env.DB.prepare("UPDATE trades SET hidden = ? WHERE id = ?").bind(hidden ? 1 : 0, id).run();
       if (extend_hours) await env.DB.prepare("UPDATE trades SET closes_at = closes_at + ?, closed_at = NULL WHERE id = ?").bind(Number(extend_hours) * 3600e3, id).run();
@@ -484,9 +544,9 @@ async function route(req, env, ctx) {
     }
     // Admin-Liste: Zeitstempel und Teilnahme, keine Ergebnisse (Commish ohne Sonderansicht)
     if (a === "/trades" && M === "GET") {
-      const { results } = await env.DB.prepare(`SELECT t.id, t.description, t.opened_at, t.closes_at, t.closed_at, t.hidden,
+      const { results } = await env.DB.prepare(`SELECT t.id, t.description, t.opened_at, t.closes_at, t.closed_at, t.hidden, t.size,
           (SELECT COUNT(*) FROM trade_votes v WHERE v.trade_id = t.id) AS voted FROM trades t WHERE league_id = ? ORDER BY opened_at DESC`).bind(L).all();
-      return json(results);
+      return json(results.map(r => ({ ...r, size: r.size ? JSON.parse(r.size) : null })));
     }
 
     if (a === "/polls" && M === "POST") {

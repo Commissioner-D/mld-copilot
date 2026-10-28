@@ -11,7 +11,8 @@ SEASON_WEEKS = "17"             # Wochen, die fuer PfO zaehlen (inkl. Playoffs)
 TEST_MODE = "0"                 # "1" = Beteiligte duerfen mitstimmen (nur zum Testen)
 ALLOWED_ORIGINS = "https://commissioner-d.github.io"
 LEAGUE_DATA_URL = "https://raw.githubusercontent.com/Commissioner-D/mld-free-agents/data/data/league.json"
-LEAGUE_DATA_LEAGUE = "294292"    # league.json gilt nur fuer die MLD
+LEAGUE_DATA_LEAGUE = "294292"
+VALUES_URL = "https://raw.githubusercontent.com/Commissioner-D/mld-copilot/main/data/values.json"    # league.json gilt nur fuer die MLD
 
 [[d1_databases]]
 binding = "DB"

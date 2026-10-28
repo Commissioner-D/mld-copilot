@@ -44,6 +44,13 @@ const INFO = {
       <p>Gewichteter Vorzeichentest:</p>
       <p class="formula">n<sub>eff</sub> = Plus + Minus + Fair + ½ · Nicht-Abstimmende<br>z = (|Plus − Minus| − 1) / √n<sub>eff</sub></p>
       <p>Tendenz ab |z| ≥ ${EVAL.zTendency.toString().replace(".", ",")}, klares Urteil ab |z| ≥ ${EVAL.zClear.toString().replace(".", ",")}. Die Frage dahinter: Wie wahrscheinlich wäre so ein einseitiges Ergebnis, wenn alle nur eine Münze geworfen hätten? Ist es sehr unwahrscheinlich, steckt eine echte Meinung dahinter.</p></details>
+      <h3>Tragweite</h3>
+      <p>Jeder Trade bekommt eine <b>Tragweite</b>: klein, mittel oder groß. Sie sagt nur, wie viel Wert insgesamt bewegt wird, <i>nicht</i>, wer gewonnen hat. Ein später 3rd gegen einen Ersatzspieler ist klein, zwei 1sts gegen einen Top-WR ist groß.</p>
+      <ul><li>Gemessen wird die wertvollere Seite, in „frühen 1sts“. Ab etwa einem späten 1st ist ein Trade mittel, ab etwa einem frühen 1st groß.</li>
+      <li><b>Picks:</b> nach dem, was aus MLD-Picks seit 2020 tatsächlich geworden ist. Für den nächsten Draft zählt die Prognose (früh/mittel/spät).</li>
+      <li><b>Offensive:</b> Dynasty-Marktwerte (DynastyProcess), angepasst an unsere Wertung mit wenig PPR.</li>
+      <li><b>IDP:</b> aus unserer Wertung berechnet (Punkte über dem Ersatzmann), Reihenfolge nach Dynasty-Konsens. Maßstab: der beste LB ist etwa einen späten 1st wert.</li>
+      <li>Die Tragweite wird beim Trade festgehalten und ändert sich danach nicht mehr. Bei großen Trades schaut der Commish genauer hin, wenn die Abstimmung klar ausfällt.</li></ul>
       <h3>Umfragen</h3>
       <ul><li>Umfragen startet nur der Commish: Ja / Enthaltung / Nein oder Auswahl aus Optionen.</li>
       <li>Pro Umfrage ist festgelegt, ob sie <b>anonym</b> ist und wann man das Ergebnis sieht: jederzeit, nach der eigenen Stimme oder erst am Ende.</li>
@@ -76,6 +83,13 @@ const INFO = {
       <p>Weighted sign test:</p>
       <p class="formula">n<sub>eff</sub> = Plus + Minus + Fair + ½ · Not voted<br>z = (|Plus − Minus| − 1) / √n<sub>eff</sub></p>
       <p>Leaning from |z| ≥ ${EVAL.zTendency}, clear from |z| ≥ ${EVAL.zClear}. The idea: how likely would such a one-sided result be if everyone just flipped a coin? If very unlikely, there's a real opinion behind it.</p></details>
+      <h3>Trade size</h3>
+      <p>Every trade gets a <b>size</b>: small, medium or big. It only says how much value moves, <i>not</i> who won. A late 3rd for a backup is small, two 1sts for a top WR is big.</p>
+      <ul><li>Measured is the more valuable side, in "early 1sts". From about a late 1st a trade is medium, from about an early 1st it's big.</li>
+      <li><b>Picks:</b> based on what MLD picks since 2020 actually turned into. For the next draft the projection (early/mid/late) counts.</li>
+      <li><b>Offense:</b> dynasty market values (DynastyProcess), adjusted to our low-PPR scoring.</li>
+      <li><b>IDP:</b> computed from our scoring (points above replacement), ordered by dynasty consensus. Benchmark: the best LB is worth about a late 1st.</li>
+      <li>The size is fixed when the trade comes in. For big trades the commish takes a closer look if the vote is clear.</li></ul>
       <h3>Polls</h3>
       <ul><li>Only the commish starts polls: Yes / Abstain / No, or picking from options.</li>
       <li>Each poll sets whether it's <b>anonymous</b> and when results are shown: always, after your vote, or at the end.</li>
