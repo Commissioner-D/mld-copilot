@@ -18,7 +18,7 @@ jobs:
           mkdir -p /tmp/status
           { echo "check: $(date -u +%FT%TZ)"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
             echo "--- trades"; curl -s "$URL/api/trades" | python3 -c "import sys,json;[print(t['id'],(t['closes_at']-t['opened_at'])/3600e3,'h',t['closed']) for t in json.load(sys.stdin)]"; echo; } > /tmp/status/report.txt 2>&1 || true
-          for q in "TYPE=topOwns&COUNT=1500&JSON=1" "TYPE=players&JSON=1"; do
+          for q in "TYPE=topStarters&COUNT=1500&JSON=1"; do
             curl -s -A "mld-copilot/1.0" "https://api.myfantasyleague.com/2026/export?$q" -o "/tmp/status/mfl_$(echo "$q" | tr '&=' '__' | cut -c1-40).json" || true
           done
           ls -la /tmp/status >> /tmp/status/report.txt
