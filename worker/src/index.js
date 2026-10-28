@@ -292,7 +292,7 @@ async function tradeView(env, t, me, managers, { withComments = false, ctx = nul
   const myVote = me ? votes.find(v => v.manager_id === me.id) : null;
   const canSee = !!me && (isParticipant || !!myVote || closed);
   const view = {
-    id: t.id, status: t.status, description: t.description, sides,
+    id: t.id, league_id: t.league_id, status: t.status, description: t.description, sides,
     size: size ? { cls: size.cls, unrated: size.unrated } : null,      // Zahlen nur im Admin
     opened_at: t.opened_at, closes_at: t.closes_at, closed, closed_at: t.closed_at,
     eligible: voters.length, voted: votes.length,

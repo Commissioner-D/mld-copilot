@@ -34,12 +34,17 @@ function pickOutlook(o) {
   return o ? ", " + o.tier.split("/").map(x => t("tier_" + x)).join("/") : "";
 }
 
-function sideHtml(s, cls) {
+const FL = "https://www.fleaflicker.com/nfl/leagues/";
+const flLink = (href, text) => `<a class="fl" href="${href}" target="_blank" rel="noopener">${text}</a>`;
+
+function sideHtml(s, cls, lg) {
+  const pName = p => lg && p.fl_id ? flLink(`${FL}${lg}/players/${encodeURIComponent(p.fl_id)}`, esc(p.name)) : esc(p.name);
+  const tName = lg && s.team_id ? flLink(`${FL}${lg}/teams/${encodeURIComponent(s.team_id)}`, esc(s.team_name)) : esc(s.team_name);
   const items = [
-    ...s.players.map(p => `<li>${esc(p.name)}<span class="pos">${esc(p.pos || "")}${p.team ? " · " + esc(p.team) : ""}</span>${playerInfo(p.info, p.pos)}</li>`),
+    ...s.players.map(p => `<li>${pName(p)}<span class="pos">${esc(p.pos || "")}${p.team ? " · " + esc(p.team) : ""}</span>${playerInfo(p.info, p.pos)}</li>`),
     ...s.picks.map(p => `<li class="pick">${esc(p.season)} ${t("round")} ${esc(p.round ?? "?")}${p.from ? ` (${t("from")} ${esc(p.from)})` : ""}${pickOutlook(p.outlook)}</li>`),
   ];
-  return `<div class="side ${cls}"><h4>${esc(s.team_name)}<span class="gets">${t("gets")}</span></h4><ul>${items.join("") || "<li>–</li>"}</ul></div>`;
+  return `<div class="side ${cls}"><h4>${tName}<span class="gets">${t("gets")}</span></h4><ul>${items.join("") || "<li>–</li>"}</ul></div>`;
 }
 
 function sizeHtml(sz) {
@@ -72,7 +77,7 @@ function tradeCard(tr) {
                tr.me?.vote !== null && tr.me?.vote !== undefined ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
   return `<div class="card${tr.me?.can_vote ? " new" : ""}">
     <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
-    <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
+    <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a", tr.league_id)}${sideHtml(tr.sides[1], "b", tr.league_id)}</div>
     <div class="card-foot"><span class="meta">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</span>
     ${cardAction(`#/trade/${tr.id}`, tr)}</div></div></div>`;
 }
@@ -125,7 +130,7 @@ async function showTrade(id) {
   const tr = await api("GET", `/trades/${id}`);
   let html = `<a class="back" href="#/trades">${t("back")}</a><div class="card">
     <div class="card-head"><h3>${esc(tr.description || "")}</h3>${statusPill(tr)}</div><div class="card-body">
-    <div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
+    <div class="sides">${sideHtml(tr.sides[0], "a", tr.league_id)}${sideHtml(tr.sides[1], "b", tr.league_id)}</div>
     <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div>`;
   if (tr.me?.participant) html += `<div class="notice" style="margin:14px 0 0">${t("participant_note")}</div>`;
   if (tr.me?.can_vote) html += scaleHtml(tr);

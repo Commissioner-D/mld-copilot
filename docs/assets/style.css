@@ -234,3 +234,5 @@ details.explain ol { margin: 8px 0; padding-left: 20px; } details.explain li { m
   content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
   background: var(--text); color: var(--bg, #fff); font-size: 12px; font-weight: 600; white-space: nowrap;
   padding: 3px 8px; border-radius: 3px; pointer-events: none; z-index: 5; }
+a.fl { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
+a.fl:hover { color: var(--accent); border-bottom-color: var(--accent); }
