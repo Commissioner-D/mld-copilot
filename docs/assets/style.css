@@ -236,3 +236,4 @@ details.explain ol { margin: 8px 0; padding-left: 20px; } details.explain li { m
   padding: 3px 8px; border-radius: 3px; pointer-events: none; z-index: 5; }
 a.fl { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); }
 a.fl:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.dist .n-abst sup, .dist .n-abst sub { font-size: 10px; line-height: 0; }
