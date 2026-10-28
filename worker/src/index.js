@@ -96,19 +96,19 @@ async function leagueCtx(env, { refresh = false } = {}) {
   if (!env.LEAGUE_DATA_URL || String(env.LEAGUE_DATA_LEAGUE) !== String(leagueId(env))) return null;
   const row = await env.DB.prepare("SELECT v FROM meta WHERE k = 'league_ctx'").first();
   let ctx = row ? JSON.parse(row.v) : null;
-  if (!refresh && ctx && ctx.v === 3 && now() - ctx.fetched < 3600e3) return ctx;
+  if (!refresh && ctx && ctx.v === 4 && now() - ctx.fetched < 3600e3) return ctx;
   try {
     const r = await fetch(env.LEAGUE_DATA_URL + "?t=" + now(), { cf: { cacheTtl: 0 } });
     if (!r.ok) throw new Error("league_json_" + r.status);
     const d = await r.json();
     const players = {};
     for (const t of d.teams || []) for (const p of t.roster || []) {
-      players[p.fl_id] = { name: p.name, age: p.age, draft: p.draft, rookie: p.rookie, pos_rank: p.pos_rank, pos: p.pos,
+      players[p.fl_id] = { fl_id: p.fl_id, name: p.name, age: p.age, draft: p.draft, rookie: p.rookie, pos_rank: p.pos_rank, pos: p.pos,
                            pts_avg: p.pts_avg, injury: p.injury, snap: p.snap_last, owner: t.name };
     }
     const teams = Object.fromEntries((d.teams || []).map(t => [t.name, { slot: t.draft_slot ?? null, pfo: t.pfo ?? null }]));
     simulateSlots(d.teams || [], teams, Number(env.SEASON_WEEKS || 17));
-    ctx = { v: 3, fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
+    ctx = { v: 4, fetched: now(), generated: d.generated_utc, season: d.season, teams, players };
     await env.DB.prepare("INSERT OR REPLACE INTO meta (k, v) VALUES ('league_ctx', ?)").bind(JSON.stringify(ctx)).run();
   } catch (e) { console.error("league ctx", e); }
   return ctx;
@@ -151,7 +151,7 @@ function enrichPlayers(sides, ctx) {
     if (!i && p.fl_id == null) {                       // aeltere Eintraege ohne ID: ueber Name + Position
       byName = byName || Object.values(ctx.players).reduce((m, x) => ((m[x.name] = m[x.name] || []).push(x), m), {});
       const c = (byName[p.name] || []).filter(x => x.pos === p.pos);
-      if (c.length === 1) i = c[0];
+      if (c.length === 1) { i = c[0]; p.fl_id = i.fl_id ?? null; }   // ID nachtragen (fuer Fleaflicker-Links)
     }
     if (i && !p.info) p.info = { age: i.age, rookie: i.rookie, pos_rank: i.pos_rank,
                                  pts_avg: i.pts_avg, injury: i.injury, asof: ctx.generated };
