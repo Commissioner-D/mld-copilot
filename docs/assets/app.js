@@ -45,7 +45,9 @@ function sideHtml(s, cls) {
 function sizeHtml(sz) {
   if (!sz) return "";
   const un = sz.unrated?.length ? ` <span class="meta">(${t("unrated")}: ${sz.unrated.map(esc).join(", ")})</span>` : "";
-  return ` · ${t("size")}: <span class="size ${sz.cls}">${t("size_" + sz.cls)}</span>${un}`;
+  const n = { small: 1, medium: 2, large: 3 }[sz.cls] || 0;
+  const dots = "●".repeat(n) + "○".repeat(3 - n);
+  return ` · ${t("size")} <span class="size ${sz.cls}" title="${esc(t("size_" + sz.cls))}">${dots}</span>${un}`;
 }
 
 function statusPill(x) {
@@ -71,8 +73,7 @@ function verdictHtml(r, tr) {
   if (r.level === "none") { verdict = t("v_none"); sub = t("v_none_sub"); }
   else verdict = (r.level === "clear" ? t("v_clear", esc(name)) : t("v_tendency", esc(name)))
     + ` (${t("strength")[Math.round(r.strength)] || r.strength})`;
-  const size = tr.size ? t("v_trade")[tr.size.cls] : "";
-  let head = size ? `${size}, ${verdict}.` : verdict.charAt(0).toUpperCase() + verdict.slice(1) + ".";
+  let head = verdict.charAt(0).toUpperCase() + verdict.slice(1) + ".";
   const eligible = r.votes + r.abstentions;
   if (!tr.closed) {
     head = `${t("v_interim")}: ${head}`;
@@ -114,7 +115,7 @@ async function showTrade(id) {
   let html = `<a class="back" href="#/trades">${t("back")}</a><div class="card">
     <div class="card-head"><h3>${esc(tr.description || "")}</h3>${statusPill(tr)}</div><div class="card-body">
     <div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
-    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${tr.results ? "" : sizeHtml(tr.size)}</div>`;
+    <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div>`;
   if (tr.me?.participant) html += `<div class="notice" style="margin:14px 0 0">${t("participant_note")}</div>`;
   if (tr.me?.can_vote) html += scaleHtml(tr);
   if (tr.results) html += verdictHtml(tr.results, tr);
