@@ -35,7 +35,7 @@ const INFO = {
       <ul><li>Abstimmen dürfen alle außer den beiden beteiligten Teams. Die sehen den Stand sofort und dürfen kommentieren.</li>
       <li>Den Stand und die Kommentare siehst du erst, wenn du selbst abgestimmt hast. Vorher nur die Restzeit.</li>
       <li>Stimmen sind <b>endgültig</b>. Sonst könnte man den Zwischenstand ansehen und dann taktisch umschwenken.</li>
-      <li>Die Abstimmung endet nach 72 Stunden oder sobald alle abgestimmt haben. Sie ist ein Meinungsbild, kein Veto.</li></ul>
+      <li>Die Abstimmung endet nach 24 Stunden oder sobald alle abgestimmt haben. Sie ist ein Meinungsbild, kein Veto.</li></ul>
       <h3>So wird ausgewertet</h3>${INFO.de.short}
       <p>Nötiger Vorsprung bei 14 Stimmberechtigten:</p>
       <table class="info-table"><tr><th>Stimmen</th><th>Nicht abgestimmt</th><th>Tendenz ab</th><th>Klares Urteil ab</th></tr>${exampleRows()}</table>
@@ -67,7 +67,7 @@ const INFO = {
       <ul><li>Everyone except the two teams involved can vote. They see the standing right away and can comment.</li>
       <li>You only see the standing and comments after you've voted. Before that, just the time left.</li>
       <li>Votes are <b>final</b>, otherwise you could peek at the standing and then switch tactically.</li>
-      <li>Voting ends after 72 hours or once everyone has voted. It's a poll of opinion, not a veto.</li></ul>
+      <li>Voting ends after 24 hours or once everyone has voted. It's a poll of opinion, not a veto.</li></ul>
       <h3>How it's evaluated</h3>${INFO.en.short}
       <p>Lead needed with 14 eligible voters:</p>
       <table class="info-table"><tr><th>Votes</th><th>Not voted</th><th>Leaning from</th><th>Clear from</th></tr>${exampleRows()}</table>

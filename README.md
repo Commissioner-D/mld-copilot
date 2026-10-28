@@ -9,7 +9,7 @@ Trade-Abstimmungen, Liga-Umfragen und mehr für die Major League Dynasty.
 ## Ablauf
 
 - Der Worker prüft stündlich Fleaflicker auf Trades „Under Review“ und frisch abgeschlossene Trades
-  und öffnet dafür eine Abstimmung (72 h, `TRADE_HOURS`). Admin kann jederzeit manuell prüfen.
+  und öffnet dafür eine Abstimmung (24 h, `TRADE_HOURS`). Admin kann jederzeit manuell prüfen.
 - Jeder Manager bekommt einen persönlichen Link (`?k=…`). Der Token wird nur gehasht gespeichert.
 - Stimmen sind endgültig. Ohne eigene Stimme sieht man nur die Restzeit, Beteiligte sehen den Stand sofort.
 
