@@ -10,7 +10,7 @@ Trade-Abstimmungen, Liga-Umfragen und mehr für die Major League Dynasty.
 
 - Der Worker prüft stündlich Fleaflicker auf Trades „Under Review“ und frisch abgeschlossene Trades
   und öffnet dafür eine Abstimmung (24 h, `TRADE_HOURS`). Admin kann jederzeit manuell prüfen.
-- Jeder Manager bekommt einen persönlichen Link (`?k=…`). Der Token wird nur gehasht gespeichert.
+- Jeder Manager bekommt einen persönlichen Link (`?k=…`), der Browser merkt ihn sich (localStorage). Der Token wird nur gehasht gespeichert. Handynummern (nur Admin) für WhatsApp-Direktlinks.
 - Stimmen sind endgültig. Ohne eigene Stimme sieht man nur die Restzeit, Beteiligte sehen den Stand sofort.
 
 ## Trade-Auswertung
@@ -23,6 +23,13 @@ Skala −3…+3 (negativ = Team A hat den besseren Deal). Gewichteter Vorzeichen
 - Stärke = Median der Stimmen in Mehrheitsrichtung
 
 Parameter in `worker/src/evaluate.js`.
+
+## Tragweite
+
+Größe eines Trades (nicht wer gewonnen hat), 1,0 = früher 1st. Wertvollere Seite < 0,3 → ●○○, < 1,0 → ●●○, sonst ●●●.
+Werte aus `data/values.json`, wöchentlich erzeugt von `tools/build_values.py` (Workflow „Trade-Werte“):
+Picks aus der MLD-Draft-Historie, Offensive aus DynastyProcess (angepasst an 0,1 PPR), IDP aus der MLD-Wertung
+mit Anker „bester LB ≈ später 1st“. Wird beim Übernehmen eingefroren; Manager sehen nur die Punkte, Zahlen nur im Admin.
 
 ## Umfragen
 
@@ -38,7 +45,7 @@ Anonyme Stimmen werden ohne Verbindung zur Person gespeichert.
 
 ## Abhängigkeit: MLD Free-Agent-Radar
 
-Spielerinfos (Alter, Positionsrang, Ø Punkte, Snaps, Verletzung) und Pick-Tendenzen (aus Points for Optimum)
+Spielerinfos (Alter, Rookie, Positionsrang, Ø Punkte, Verletzung) und Pick-Tendenzen (aus Points for Optimum)
 kommen aus `league.json` des Repos `mld-free-agents` (Branch `data`, alle 4 h). Nur lesend, optional:
 fehlt die Datei, läuft alles ohne diese Zusatzinfos weiter. Spielerinfos werden beim Übernehmen eines Trades eingefroren.
 Konfiguration: `LEAGUE_DATA_URL` / `LEAGUE_DATA_LEAGUE` in `worker/wrangler.toml`.
