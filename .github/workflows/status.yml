@@ -17,7 +17,7 @@ jobs:
           URL=https://mld-copilot.commissioner-d.workers.dev
           mkdir -p /tmp/status
           { echo "check: $(date -u +%FT%TZ)"; echo "--- health"; curl -s "$URL/api/health?deep=1"; echo;
-            echo "--- trades"; curl -s "$URL/api/trades" | python3 -c "import sys,json;[print(json.dumps(t['sides'],ensure_ascii=False)) for t in json.load(sys.stdin)]"; echo; } > /tmp/status/report.txt 2>&1 || true
+            echo "--- trades"; curl -s "$URL/api/trades" | python3 -c "import sys,json;[print(t['id'],(t['closes_at']-t['opened_at'])/3600e3,'h',t['closed']) for t in json.load(sys.stdin)]"; echo; } > /tmp/status/report.txt 2>&1 || true
           cat /tmp/status/report.txt
           cd /tmp/status && git init -q && git checkout -q -b status && git add . \
             && git -c user.name=github-actions -c user.email=actions@github.com commit -qm "status" \
