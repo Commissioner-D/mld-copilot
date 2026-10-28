@@ -98,8 +98,8 @@ function verdictHtml(r, tr) {
     const names = r.ballots.filter(b => b.value === v).map(b => esc(b.name)).join(", ");
     const abst = v === 0 && ab ? `<div class="bar abst" style="height:${H(ab)}px" title="${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}"></div>` : "";
     const label = v === 0 && ab ? `<div class="abst-lab">${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}</div>` : "";
-    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> +${ab}</span>` : ""}</div>
-      ${abst}<div class="bar" style="height:${H(n)}px"></div><div class="lab">${LABELS(v)}</div>${label}<div class="names">${names}</div></div>`;
+    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="stack"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> +${ab}</span>` : ""}</div>
+      ${abst}<div class="bar" style="height:${H(n)}px"></div></div><div class="lab">${LABELS(v)}</div>${label}<div class="names">${names}</div></div>`;
   }).join("");
   return `<div class="verdict ${r.side || ""}${tr.closed ? "" : " interim"}"><b>${head}</b><span class="meta">${sub}</span></div>
     <div class="scale-labels" style="margin-top:12px"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>
