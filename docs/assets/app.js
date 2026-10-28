@@ -38,7 +38,10 @@ const FL = "https://www.fleaflicker.com/nfl/leagues/";
 const flLink = (href, text) => `<a class="fl" href="${href}" target="_blank" rel="noopener">${text}</a>`;
 
 function sideHtml(s, cls, lg) {
-  const pName = p => lg && p.fl_id ? flLink(`${FL}${lg}/players/${encodeURIComponent(p.fl_id)}`, esc(p.name)) : esc(p.name);
+  // Fleaflicker-Spielerseite: /players/<name-als-slug>-<id>, z. B. kimani-vidal-18523
+  const slug = n => String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/['’.]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const pName = p => lg && p.fl_id ? flLink(`${FL}${lg}/players/${slug(p.name)}-${encodeURIComponent(p.fl_id)}`, esc(p.name)) : esc(p.name);
   const tName = lg && s.team_id ? flLink(`${FL}${lg}/teams/${encodeURIComponent(s.team_id)}`, esc(s.team_name)) : esc(s.team_name);
   const items = [
     ...s.players.map(p => `<li>${pName(p)}<span class="pos">${esc(p.pos || "")}${p.team ? " · " + esc(p.team) : ""}</span>${playerInfo(p.info, p.pos)}</li>`),
