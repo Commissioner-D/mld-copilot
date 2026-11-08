@@ -43,7 +43,8 @@ const a = k => A[LANG][k];
 const $m = document.querySelector("main");
 const KEY = () => store.get("mldc_admin");
 const adm = (method, path, body) => api(method, "/admin" + path, body, { "X-Admin-Key": KEY() || "" });
-const PAGE = location.href.replace(/admin\.html.*$/, "");
+// Basis-Adresse ohne Query/Hash; GitHub Pages liefert die Admin-Seite auch als /admin (ohne .html).
+const PAGE = location.origin + location.pathname.replace(/admin(\.html)?\/?$/, "");
 
 function loginView(err) {
   $m.innerHTML = `<div class="card admin"><div class="card-body">
