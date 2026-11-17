@@ -103,17 +103,40 @@ function verdictHtml(r, tr) {
   const H = n => Math.round(70 * n / max);
   const cols = [-3, -2, -1, 0, 1, 2, 3].map(v => {
     const n = r.distribution[v] || 0;
-    const names = r.ballots.filter(b => b.value === v).map(b => esc(b.name)).join(", ");
+    const names = r.ballots.filter(b => b.value === v).map(b => b.name).join(", ");
+    const lab = v === 0 ? LABELS(0) : `${LABELS(v)} · ${tr.sides[v < 0 ? 0 : 1].team_name}`;
     const abst = v === 0 && ab ? `<div class="bar abst" style="height:${H(ab)}px" title="${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}"></div>` : "";
     const label = v === 0 && ab ? `<div class="abst-lab">${esc(t(tr.closed ? "abst_closed" : "abst_open", ab))}</div>` : "";
-    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}"><div class="stack"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> + <sup>${ab}</sup>⁄<sub>${Math.round(1 / EVAL.w)}</sub></span>` : ""}</div>
-      ${abst}<div class="bar" style="height:${H(n)}px"></div></div><div class="lab">${LABELS(v)}</div>${label}<div class="names">${names}</div></div>`;
+    return `<div class="col ${v < 0 ? "a" : v > 0 ? "b" : ""}${whoPin === v ? " pin" : ""}" data-v="${v}" data-lab="${esc(lab)}" data-names="${esc(names)}" tabindex="0" role="button" aria-label="${esc(lab)}: ${n}"><div class="stack"><div class="n">${n || ""}${v === 0 && ab ? `<span class="n-abst"> + <sup>${ab}</sup>⁄<sub>${Math.round(1 / EVAL.w)}</sub></span>` : ""}</div>
+      ${abst}<div class="bar" style="height:${H(n)}px"></div></div><div class="lab">${LABELS(v)}</div>${label}</div>`;
   }).join("");
   return `<div class="verdict ${r.side || ""}${tr.closed ? "" : " interim"}"><b>${head}</b><span class="meta">${sub}</span></div>
     <div class="scale-labels" style="margin-top:12px"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>
-    <div class="dist">${cols}</div>
+    <div class="dist">${cols}</div><div class="who" id="who">${t("who_hint")}</div>
     <div class="meta" style="margin-top:8px">${t("voted_of", r.votes, r.votes + r.abstentions)} · ${leadLine(r)}</div>
     <details class="explain"><summary>${t("how")}</summary>${INFO[LANG].short}<a href="#/info">${t("more_info")}</a></details>`;
+}
+
+// Wer wie gestimmt hat: nur auf Wunsch. Maus darueber zeigt die Namen, Klick/Tippen haelt sie fest (nochmal = weg).
+let whoPin = null;
+function bindWho() {
+  const dist = document.querySelector(".dist"), who = document.getElementById("who"); if (!dist || !who) return;
+  const show = col => {
+    if (!col) { who.textContent = t("who_hint"); who.classList.remove("on"); return; }
+    who.innerHTML = `<b>${esc(col.dataset.lab)}:</b> ${col.dataset.names ? esc(col.dataset.names) : t("who_none")}`;
+    who.classList.add("on");
+  };
+  const colOf = e => e.target.closest(".col");
+  const pin = col => {
+    whoPin = whoPin === Number(col.dataset.v) ? null : Number(col.dataset.v);
+    dist.querySelectorAll(".col").forEach(c => c.classList.toggle("pin", Number(c.dataset.v) === whoPin));
+    show(whoPin === null ? null : col);
+  };
+  dist.onclick = e => { const c = colOf(e); if (c) pin(c); };
+  dist.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { const c = colOf(e); if (c) { e.preventDefault(); pin(c); } } };
+  dist.onmouseover = e => { const c = colOf(e); if (c && whoPin === null) show(c); };
+  dist.onmouseleave = () => { if (whoPin === null) show(null); };
+  if (whoPin !== null) show(dist.querySelector(`.col[data-v="${whoPin}"]`));
 }
 
 function scaleHtml(tr) {
@@ -172,6 +195,7 @@ async function showTrade(id) {
   }, () => showTrade(id));
   bindComment("trade", tr.id, () => showTrade(id));
   bindReactions();
+  bindWho();
 }
 
 // ---------- Umfragen ----------

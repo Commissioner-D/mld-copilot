@@ -53,6 +53,7 @@ const STR = {
     err_statement_required: "Bei „klar“ brauchst du eine Begründung (mindestens 3 Zeichen).",
     err_own_comment: "Auf den eigenen Kommentar kannst du nicht reagieren.",
     like: "Gefällt mir", dislike: "Gefällt mir nicht",
+    who_hint: "Wer wie gestimmt hat: Säule antippen oder mit der Maus darüberfahren.", who_none: "niemand",
     react_note: "Likes und Dislikes sind anonym, sichtbar ist nur die Summe. Du kannst sie ändern oder mit erneutem Klick zurücknehmen.",
   },
   en: {
@@ -100,6 +101,7 @@ const STR = {
     err_statement_required: "A reason is required for “clearly” (at least 3 characters).",
     err_own_comment: "You can't react to your own comment.",
     like: "Like", dislike: "Dislike",
+    who_hint: "Who voted how: tap a column or hover over it.", who_none: "nobody",
     react_note: "Likes and dislikes are anonymous, only the totals are shown. You can change them or take them back with another click.",
   },
 };
