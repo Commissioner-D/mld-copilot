@@ -6,7 +6,7 @@ const A = {
     link: "Link", new_link: "Neuer Link", link_note: "Nur jetzt sichtbar. Ein neuer Link macht den alten ungültig.",
     size: "Tragweite", resize: "Tragweite neu", resize_t: "Mit aktuellen Werten neu berechnen", copy: "Kopieren", copied: "Kopiert", whatsapp: "Per WhatsApp", save: "Speichern",
     msg: (name, link) => `Servus ${name}! Dein persönlicher Link für den MLD-Copilot (Trade-Abstimmungen & Umfragen). Nicht weitergeben:\n${link}`,
-    test_trade: "Test-Trade anlegen / zurücksetzen", test_for: "sichtbar nur für", test_done: "Test-Trade bereit",
+    test_trade: "Test-Trade anlegen / zurücksetzen", test_for: "Test-Trade sichtbar für", test_all: "Alle / keine", test_none: "Bitte mindestens einen Manager auswählen", test_done: n => `Test-Trade bereit für ${n} Manager`,
     trades: "Trades", check: "Jetzt auf neue Trades prüfen", checked: r => `${r.added} neu, ${r.updated} aktualisiert`,
     recent: "Abgeschlossene Trades aus Fleaflicker", import: "Zur Abstimmung", imported: "übernommen",
     votes: "Stimmen", close: "Beenden", extend: "+24 h", hide: "Ausblenden", show: "Einblenden",
@@ -26,7 +26,7 @@ const A = {
     link: "Link", new_link: "New link", link_note: "Shown only now. A new link invalidates the old one.",
     size: "Size", resize: "Recalc size", resize_t: "Recalculate with current values", copy: "Copy", copied: "Copied", whatsapp: "Via WhatsApp", save: "Save",
     msg: (name, link) => `Hey ${name}! Your personal MLD-Copilot link (trade votes & polls). Don't share it:\n${link}`,
-    test_trade: "Create / reset test trade", test_for: "visible only to", test_done: "Test trade ready",
+    test_trade: "Create / reset test trade", test_for: "Test trade visible to", test_all: "All / none", test_none: "Please select at least one manager", test_done: n => `Test trade ready for ${n} ${n === 1 ? "manager" : "managers"}`,
     trades: "Trades", check: "Check for new trades now", checked: r => `${r.added} new, ${r.updated} updated`,
     recent: "Completed trades from Fleaflicker", import: "Open vote", imported: "imported",
     votes: "votes", close: "Close", extend: "+24 h", hide: "Hide", show: "Show",
@@ -44,6 +44,7 @@ const A = {
 const a = k => A[LANG][k];
 const $m = document.querySelector("main");
 const KEY = () => store.get("mldc_admin");
+let testSel = null;          // zuletzt gewaehlte Betrachter des Test-Trades (bleibt nach dem Neuzeichnen erhalten)
 const adm = (method, path, body) => api(method, "/admin" + path, body, { "X-Admin-Key": KEY() || "" });
 // Basis-Adresse ohne Query/Hash; GitHub Pages liefert die Admin-Seite auch als /admin (ohne .html).
 const PAGE = location.origin + location.pathname.replace(/admin(\.html)?\/?$/, "");
@@ -78,9 +79,10 @@ async function render() {
 
   <div class="card"><div class="card-head"><h3>${a("trades")}</h3><button class="btn small" id="check">${a("check")}</button></div>
   <div class="card-body"><div class="meta" id="checkres"></div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px"><span class="meta">${a("test_for")}</span>
-    <select id="testmgr">${mgrs.filter(m => m.active).map(m => `<option value="${m.id}"${m.team_id === 1476731 ? " selected" : ""}>${esc(m.team_name)}</option>`).join("")}</select>
-    <button class="btn small" id="mktest">${a("test_trade")}</button></div>
+  <div style="margin:6px 0 12px"><div class="meta">${a("test_for")}</div>
+    <div id="testmgrs" style="display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0">${mgrs.filter(m => m.active).map(m =>
+      `<label style="white-space:nowrap"><input type="checkbox" value="${m.id}"${(testSel ? testSel.includes(m.id) : m.team_id === 1476731) ? " checked" : ""}> ${esc(m.team_name)}</label>`).join("")}</div>
+    <button class="btn small" id="testall">${a("test_all")}</button> <button class="btn small" id="mktest">${a("test_trade")}</button></div>
   <div class="table-wrap"><table>${trades.map(tr => `<tr data-tid="${tr.id}"><td>${esc(tr.description || tr.id)}<div class="meta">${fmtDate(tr.opened_at)} · ${tr.voted} ${a("votes")} · ${tr.size ? `${a("size")} ${tr.size.v.toFixed(2)} (${tr.size.sides.map(x => x.toFixed(2)).join(" / ")})${tr.size.unrated.length ? " · ? " + esc(tr.size.unrated.join(", ")) : ""} · ` : ""}${tr.closed_at || Date.now() > tr.closes_at ? a("closed") : countdown(tr.closes_at)}</div></td>
     <td style="white-space:nowrap"><button class="btn small" data-act="extend">${a("extend")}</button>
     <button class="btn small" data-act="close">${a("close")}</button>
@@ -137,8 +139,14 @@ async function render() {
     };
   });
   document.getElementById("mktest").onclick = async () => {
-    await adm("POST", "/trades/test", { manager_id: Number(document.getElementById("testmgr").value) });
-    document.getElementById("checkres").textContent = a("test_done"); render();
+    const ids = [...document.querySelectorAll("#testmgrs input:checked")].map(x => Number(x.value));
+    if (!ids.length) { document.getElementById("checkres").textContent = a("test_none"); return; }
+    await adm("POST", "/trades/test", { manager_ids: ids }); testSel = ids;
+    await render(); document.getElementById("checkres").textContent = a("test_done")(ids.length);
+  };
+  document.getElementById("testall").onclick = () => {
+    const boxes = [...document.querySelectorAll("#testmgrs input")], all = boxes.every(x => x.checked);
+    boxes.forEach(x => { x.checked = !all; });
   };
   document.getElementById("check").onclick = async () => {
     const r = await adm("POST", "/trades/check"); document.getElementById("checkres").textContent = a("checked")(r);

@@ -44,6 +44,8 @@ async function body(req) {
   try { return await req.json(); } catch { throw new HttpError(400, "invalid_json"); }
 }
 
+// Sichtbarkeit: normale Trades fuer alle, eingeschraenkte (Test-Trade) nur fuer die in trade_viewers Eingetragenen
+const VISIBLE = "(only_for IS NULL OR id IN (SELECT trade_id FROM trade_viewers WHERE manager_id = ?))";
 const TEST_TRADE_ID = 9990001;     // Test-Trade (kein Fleaflicker-Trade)
 const leagueId = env => Number(env.LEAGUE_ID);
 const tradeHours = env => Number(env.TRADE_HOURS || 72);
@@ -388,7 +390,7 @@ async function listComments(env, target, id, anonymous, managers, me = null) {
 async function canSeeComments(env, target, id, me, managers) {
   const L = leagueId(env);
   if (target === "trade") {
-    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND (only_for IS NULL OR only_for = ?)").bind(Number(id), L, me.id).first();
+    const t = await env.DB.prepare(`SELECT * FROM trades WHERE id = ? AND league_id = ? AND ${VISIBLE}`).bind(Number(id), L, me.id).first();
     if (!t) throw new HttpError(404, "not_found");
     return !!(await tradeView(env, t, me, managers)).results;
   }
@@ -433,18 +435,18 @@ async function route(req, env, ctx) {
     return json(me ? { team_id: me.team_id, team_name: me.team_name, owner_name: me.owner_name } : null);
 
   if (path === "/api/trades" && M === "GET") {
-    const { results } = await env.DB.prepare("SELECT * FROM trades WHERE league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?) ORDER BY opened_at DESC LIMIT 50").bind(L, me ? me.id : -1).all();
+    const { results } = await env.DB.prepare(`SELECT * FROM trades WHERE league_id = ? AND hidden = 0 AND ${VISIBLE} ORDER BY opened_at DESC LIMIT 50`).bind(L, me ? me.id : -1).all();
     const ctx = await leagueCtx(env), vals = await getValues(env);
     return json(await Promise.all(results.map(t => tradeView(env, t, me, managers, { ctx, vals }))));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)$/)) && M === "GET") {
-    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?)").bind(Number(m[1]), L, me ? me.id : -1).first();
+    const t = await env.DB.prepare(`SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND ${VISIBLE}`).bind(Number(m[1]), L, me ? me.id : -1).first();
     if (!t) throw new HttpError(404, "not_found");
     return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env), vals: await getValues(env) }));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)\/vote$/)) && M === "POST") {
     if (!me) throw new HttpError(401, "token_required");
-    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?)").bind(Number(m[1]), L, me ? me.id : -1).first();
+    const t = await env.DB.prepare(`SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND ${VISIBLE}`).bind(Number(m[1]), L, me ? me.id : -1).first();
     if (!t) throw new HttpError(404, "not_found");
     const v = await tradeView(env, t, me, managers);
     if (v.closed) throw new HttpError(409, "closed");
@@ -504,7 +506,7 @@ async function route(req, env, ctx) {
     if (!clean) throw new HttpError(400, "empty");
     let anonymous = false;
     if (target === "trade") {
-      const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND (only_for IS NULL OR only_for = ?)").bind(Number(id), L, me.id).first();
+      const t = await env.DB.prepare(`SELECT * FROM trades WHERE id = ? AND league_id = ? AND ${VISIBLE}`).bind(Number(id), L, me.id).first();
       if (!t) throw new HttpError(404, "not_found");
       const v = await tradeView(env, t, me, managers);
       if (!v.results) throw new HttpError(403, "vote_first");
@@ -599,11 +601,13 @@ async function route(req, env, ctx) {
               opened, opened + tradeHours(env) * 3600e3).run();
       return json({ ok: true });
     }
-    // Test-Trade: gibt es bei Fleaflicker nicht, nur fuer einen Manager sichtbar. Erneutes Anlegen setzt ihn zurueck.
+    // Test-Trade: gibt es bei Fleaflicker nicht, nur fuer ausgewaehlte Manager sichtbar. Erneutes Anlegen setzt ihn zurueck.
     if (a === "/trades/test" && M === "POST") {
-      const { manager_id } = await body(req);
-      const mgr = await env.DB.prepare("SELECT id FROM managers WHERE id = ? AND league_id = ?").bind(Number(manager_id), L).first();
-      if (!mgr) throw new HttpError(404, "not_found");
+      const { manager_ids } = await body(req);
+      const ids = [...new Set((Array.isArray(manager_ids) ? manager_ids : []).map(Number).filter(Number.isInteger))];
+      if (!ids.length) throw new HttpError(400, "need_managers");
+      const known = new Set((await env.DB.prepare("SELECT id FROM managers WHERE league_id = ?").bind(L).all()).results.map(r => r.id));
+      if (ids.some(i => !known.has(i))) throw new HttpError(404, "not_found");
       const sides = [
         { team_id: null, team_name: "Team Testadler", players: [{ fl_id: null, name: "Testi Receiver", pos: "WR", team: "TST" }], picks: [{ season: new Date().getUTCFullYear() + 1, round: 1, orig: "Team Testadler", from: null }] },
         { team_id: null, team_name: "Team Probelauf", players: [{ fl_id: null, name: "Probe Linebacker", pos: "LB", team: "TST" }], picks: [] },
@@ -615,9 +619,11 @@ async function route(req, env, ctx) {
         env.DB.prepare("DELETE FROM comments WHERE target = 'trade' AND target_id = ?").bind(TEST_TRADE_ID),
         env.DB.prepare("DELETE FROM trade_votes WHERE trade_id = ?").bind(TEST_TRADE_ID),
         env.DB.prepare("DELETE FROM trades WHERE id = ?").bind(TEST_TRADE_ID),
+        env.DB.prepare("DELETE FROM trade_viewers WHERE trade_id = ?").bind(TEST_TRADE_ID),
         env.DB.prepare(`INSERT INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at, only_for)
-                        VALUES (?, ?, NULL, ?, ?, -1, -2, ?, ?, ?)`)
-          .bind(TEST_TRADE_ID, L, "TEST-TRADE: gibt es bei Fleaflicker nicht, nur für dich sichtbar", JSON.stringify(sides), t0, t0 + 7 * 86400e3, mgr.id),
+                        VALUES (?, ?, NULL, ?, ?, -1, -2, ?, ?, 1)`)
+          .bind(TEST_TRADE_ID, L, "TEST-TRADE: gibt es bei Fleaflicker nicht, nur für Ausgewählte sichtbar", JSON.stringify(sides), t0, t0 + 7 * 86400e3),
+        ...ids.map(i => env.DB.prepare("INSERT INTO trade_viewers (trade_id, manager_id) VALUES (?, ?)").bind(TEST_TRADE_ID, i)),
       ];
       // Beispiel-Kommentare ohne Absender, damit man Likes/Dislikes ausprobieren kann
       [[-3, "[Test] Testi Receiver plus ein 1st ist viel mehr wert als ein Linebacker."], [2, "[Test] Der Linebacker ist fast so gut, ich sehe es eher bei Probelauf."], [0, "[Test] Passt für beide."]]
