@@ -149,6 +149,18 @@ main { max-width: 820px; margin: 0 auto; padding: 16px 16px 64px; }
 .comment .who { font-weight: 700; font-size: 13px; }
 .comment .when { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .comment p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment .pill.vp { margin-left: 6px; vertical-align: 1px; }
+.react { display: flex; gap: 6px; margin-top: 6px; }
+.rbtn { display: inline-flex; align-items: center; gap: 5px; min-width: 40px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.rbtn svg { display: block; }
+.rbtn.down svg { transform: rotate(180deg); }
+.rbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.rbtn:disabled { cursor: default; opacity: .75; }
+.rbtn.sel { border-color: var(--accent); color: var(--accent); background: var(--surface-2); opacity: 1; }
+.stmt { margin-top: 10px; }
+.stmt label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.stmt textarea { width: 100%; box-sizing: border-box; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; background: var(--surface); color: var(--text); font: inherit; }
+.confirm .btn:disabled { opacity: .5; cursor: not-allowed; }
 .comment-form { display: flex; gap: 8px; margin-top: 10px; }
 .comment-form textarea { flex: 1; min-height: 42px; resize: vertical; border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; background: var(--surface); color: var(--text); font: inherit; }
 

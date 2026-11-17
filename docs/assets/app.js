@@ -79,7 +79,7 @@ function tradeCard(tr) {
   const mine = tr.me?.participant ? `<span class="pill mine">${t("your_trade")}</span>` :
                tr.me?.vote !== null && tr.me?.vote !== undefined ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
   return `<div class="card${tr.me?.can_vote ? " new" : ""}">
-    <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${mine} ${statusPill(tr)}</div></div>
+    <div class="card-head"><h3>${esc(tr.sides[0].team_name)} ⇄ ${esc(tr.sides[1].team_name)}</h3><div>${tr.test ? '<span class="pill">TEST</span> ' : ""}${mine} ${statusPill(tr)}</div></div>
     <div class="card-body"><div class="sides">${sideHtml(tr.sides[0], "a")}${sideHtml(tr.sides[1], "b")}</div>
     <div class="card-foot"><span class="meta">${fmtDate(tr.opened_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</span>
     ${cardAction(`#/trade/${tr.id}`, tr)}</div></div></div>`;
@@ -122,34 +122,56 @@ function scaleHtml(tr) {
   return `<div class="question">${t("question")}</div>
     <div class="scale-labels"><span class="la">◀ ${esc(tr.sides[0].team_name)}</span><span class="lb">${esc(tr.sides[1].team_name)} ▶</span></div>
     <div class="scale" id="scale">${btns}</div>
-    ${pending && pending.kind === "trade" ? confirmHtml() : `<div class="meta" style="margin-top:6px">${t("final_note")}</div>`}`;
+    ${pending && pending.kind === "trade" ? stmtHtml() + confirmHtml(stmtBlocked()) : `<div class="meta" style="margin-top:6px">${t("final_note")}</div>`}`;
 }
 
-function confirmHtml() {
-  return `<div class="confirm"><span>${t("confirm")}</span><button class="btn" id="c-no">${t("cancel")}</button><button class="btn primary" id="c-yes">${t("submit")}</button></div><div class="err" id="vote-err"></div>`;
+// Begruendung zur Stimme: bei "klar" (+-3) Pflicht (mind. 3 Zeichen), bei "deutlich" (+-2) freiwillig, sonst kein Feld
+const STMT_MIN = 3;
+function stmtBlocked() {
+  return !!pending && pending.kind === "trade" && Math.abs(pending.value) === 3 && (pending.text || "").trim().length < STMT_MIN;
+}
+function stmtHtml() {
+  const v = Math.abs(pending.value);
+  if (v < 2) return "";
+  return `<div class="stmt"><label for="stmt-text">${t(v === 3 ? "stmt_req" : "stmt_opt")}</label>
+    <textarea id="stmt-text" maxlength="1000" placeholder="${t("stmt_ph")}">${esc(pending.text || "")}</textarea></div>`;
+}
+
+function confirmHtml(disabled = false) {
+  return `<div class="confirm"><span>${t("confirm")}</span><button class="btn" id="c-no">${t("cancel")}</button><button class="btn primary" id="c-yes"${disabled ? " disabled" : ""}>${t("submit")}</button></div><div class="err" id="vote-err"></div>`;
 }
 
 async function showTrade(id) {
   const tr = await api("GET", `/trades/${id}`);
   let html = `<a class="back" href="#/trades">${t("back")}</a><div class="card">
-    <div class="card-head"><h3>${esc(tr.description || "")}</h3>${statusPill(tr)}</div><div class="card-body">
+    <div class="card-head"><h3>${esc(tr.description || "")}</h3><div>${tr.test ? '<span class="pill">TEST</span> ' : ""}${statusPill(tr)}</div></div><div class="card-body">
     <div class="sides">${sideHtml(tr.sides[0], "a", tr.league_id)}${sideHtml(tr.sides[1], "b", tr.league_id)}</div>
     <div class="meta" style="margin-top:8px">${fmtDate(tr.opened_at)} · ${tr.closed ? t("ended") + " " + fmtDate(tr.closed_at || tr.closes_at) : t("ends") + " " + fmtDate(tr.closes_at)} · ${t("voted_of", tr.voted, tr.eligible)}${sizeHtml(tr.size)}</div>`;
   if (tr.me?.participant) html += `<div class="notice" style="margin:14px 0 0">${t("participant_note")}</div>`;
   if (tr.me?.can_vote) html += scaleHtml(tr);
   if (tr.results) html += verdictHtml(tr.results, tr);
   else if (!tr.closed) html += `<div class="notice" style="margin:14px 0 0">${t("hidden_until_vote")}</div>`;
-  if (tr.comments) html += commentsHtml(tr.comments);
+  if (tr.comments) html += commentsHtml(tr.comments, false, tr);
   html += `</div></div>`;
   $main.innerHTML = html;
 
   const scale = document.getElementById("scale");
   if (scale) scale.onclick = e => {
     const b = e.target.closest("button[data-v]"); if (!b) return;
-    pending = { kind: "trade", id: tr.id, value: Number(b.dataset.v) }; showTrade(id);
+    const text = pending && pending.kind === "trade" ? pending.text : "";     // getippten Text beim Umwaehlen behalten
+    pending = { kind: "trade", id: tr.id, value: Number(b.dataset.v), text }; showTrade(id);
   };
-  bindConfirm(async () => api("POST", `/trades/${tr.id}/vote`, { value: pending.value }), () => showTrade(id));
+  const st = document.getElementById("stmt-text");
+  if (st) {
+    st.oninput = () => { pending.text = st.value; const y = document.getElementById("c-yes"); if (y) y.disabled = stmtBlocked(); };
+    if (Math.abs(pending.value) === 3) st.focus();
+  }
+  bindConfirm(async () => {
+    if (stmtBlocked()) throw Object.assign(new Error("statement_required"), { code: "statement_required" });
+    return api("POST", `/trades/${tr.id}/vote`, { value: pending.value, text: pending.text || "" });
+  }, () => showTrade(id));
   bindComment("trade", tr.id, () => showTrade(id));
+  bindReactions();
 }
 
 // ---------- Umfragen ----------
@@ -223,7 +245,7 @@ async function showPoll(id) {
   if (p.results) html += pollResultsHtml(p);
   else if (p.me?.voted || p.closed) html += `<div class="notice" style="margin:14px 0 0">${t("hidden_until_close")}</div>`;
   else html += `<div class="notice" style="margin:14px 0 0">${t(p.visibility === "after_close" ? "hidden_until_close" : "hidden_until_vote")}</div>`;
-  if (p.comments) html += commentsHtml(p.comments, p.anonymous);
+  if (p.comments) html += commentsHtml(p.comments, p.anonymous, null);
   html += `</div></div>`;
   $main.innerHTML = html;
 
@@ -240,13 +262,30 @@ async function showPoll(id) {
   };
   bindConfirm(async () => api("POST", `/polls/${p.id}/vote`, { choice: pending.value }), () => showPoll(id));
   bindComment("poll", p.id, () => showPoll(id));
+  bindReactions();
 }
 
 // ---------- Kommentare & Bestaetigung ----------
-function commentsHtml(list, anonymous) {
-  const items = list.length ? list.map(c => `<div class="comment"><span class="who">${esc(c.name || t("anonymous_person"))}</span>
-    <span class="when">${fmtDate(c.created_at)}</span><p>${esc(c.body)}</p></div>`).join("") : `<div class="meta">${t("no_comments")}</div>`;
-  return `<div class="comments"><h4>${t("comments")}${anonymous ? ` <span class="pill">${t("anon")}</span>` : ""}</h4>${items}
+const THUMB = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L13.17 1 6.59 7.59C6.22 7.95 6 8.45 6 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>';
+
+// Likes/Dislikes sind anonym: der Server speichert nur einen Schluessel aus deinem Link und dem Kommentar,
+// keine Person. Aenderbar: anderen Knopf klicken wechselt, denselben nochmal klicken nimmt es zurueck.
+function reactHtml(c) {
+  const off = c.mine ? " disabled" : "";
+  const btn = (v, n, label) => `<button type="button" class="rbtn${v < 0 ? " down" : ""}${c.my === v ? " sel" : ""}" data-c="${c.id}" data-r="${v}" title="${esc(label)}" aria-label="${esc(label)}" aria-pressed="${c.my === v}"${off}>${THUMB}<span>${n || ""}</span></button>`;
+  return `<div class="react">${btn(1, c.likes, t("like"))}${btn(-1, c.dislikes, t("dislike"))}</div>`;
+}
+
+// Zu welcher Stimme gehoert die Begruendung ("klar · Team X")
+function stmtPill(c, tr) {
+  if (!c.vote_value || !tr) return "";
+  return ` <span class="pill vp">${esc(LABELS(c.vote_value))} · ${esc(c.vote_value < 0 ? tr.sides[0].team_name : tr.sides[1].team_name)}</span>`;
+}
+
+function commentsHtml(list, anonymous, tr) {
+  const items = list.length ? list.map(c => `<div class="comment"><span class="who">${esc(c.name || t("anonymous_person"))}</span>${stmtPill(c, tr)}
+    <span class="when">${fmtDate(c.created_at)}</span><p>${esc(c.body)}</p>${reactHtml(c)}</div>`).join("") : `<div class="meta">${t("no_comments")}</div>`;
+  return `<div class="comments"><h4>${t("comments")}${anonymous ? ` <span class="pill">${t("anon")}</span>` : ""}</h4>${list.length ? `<div class="meta" style="margin-bottom:4px">${t("react_note")}</div>` : ""}${items}
     <form class="comment-form" id="cform"><textarea maxlength="1000" placeholder="${t("write")}" required></textarea><button class="btn primary">${t("send")}</button></form>
     <div class="err" id="c-err"></div></div>`;
 }
@@ -258,6 +297,27 @@ function bindConfirm(send, done) {
     yes.disabled = true;
     try { await send(); pending = null; done(); }
     catch (e) { document.getElementById("vote-err").textContent = errText(e); yes.disabled = false; }
+  };
+}
+
+function bindReactions() {
+  const box = document.querySelector(".comments"); if (!box) return;
+  box.onclick = async e => {
+    const b = e.target.closest("button.rbtn"); if (!b || b.disabled) return;
+    document.getElementById("c-err").textContent = "";
+    const row = b.closest(".react"), btns = [...row.querySelectorAll("button")];
+    const want = Number(b.dataset.r), had = btns.find(x => x.classList.contains("sel"));
+    const value = had === b ? 0 : want;                              // nochmal klicken = zuruecknehmen
+    btns.forEach(x => { x.disabled = true; });
+    try {
+      const r = await api("POST", `/comments/${b.dataset.c}/react`, { value });
+      btns[0].querySelector("span").textContent = r.likes || "";
+      btns[1].querySelector("span").textContent = r.dislikes || "";
+      btns.forEach((x, i) => { const on = r.my === (i === 0 ? 1 : -1); x.classList.toggle("sel", on); x.setAttribute("aria-pressed", on); });
+    } catch (err) {
+      document.getElementById("c-err").textContent = errText(err);
+    }
+    btns.forEach(x => { x.disabled = false; });
   };
 }
 

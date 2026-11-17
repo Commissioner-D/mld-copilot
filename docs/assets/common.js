@@ -49,6 +49,11 @@ const STR = {
     theme: "Darstellung", lang: "Sprache", settings: "Einstellungen",
     th_system: "Wie Gerät", th_light: "Hell", th_dark: "Dunkel",
     logout: "Link auf diesem Gerät vergessen", logout_confirm: "Wirklich abmelden? Du brauchst danach deinen Link erneut.", trade_poll: "Zum Trade",
+    stmt_req: "Begründung (Pflicht bei „klar“)", stmt_opt: "Magst du kurz sagen, warum? (freiwillig)", stmt_ph: "Kurz begründen …",
+    err_statement_required: "Bei „klar“ brauchst du eine Begründung (mindestens 3 Zeichen).",
+    err_own_comment: "Auf den eigenen Kommentar kannst du nicht reagieren.",
+    like: "Gefällt mir", dislike: "Gefällt mir nicht",
+    react_note: "Likes und Dislikes sind anonym, sichtbar ist nur die Summe. Du kannst sie ändern oder mit erneutem Klick zurücknehmen.",
   },
   en: {
     trades: "Trades", polls: "Polls", admin: "Admin", info: "Info", how: "How this is evaluated", more_info: "More under Info →",
@@ -91,6 +96,11 @@ const STR = {
     theme: "Appearance", lang: "Language", settings: "Settings",
     th_system: "Match device", th_light: "Light", th_dark: "Dark",
     logout: "Forget link on this device", logout_confirm: "Sign out? You'll need your link again afterwards.", trade_poll: "Go to trade",
+    stmt_req: "Reason (required for “clearly”)", stmt_opt: "Care to say why? (optional)", stmt_ph: "Briefly explain …",
+    err_statement_required: "A reason is required for “clearly” (at least 3 characters).",
+    err_own_comment: "You can't react to your own comment.",
+    like: "Like", dislike: "Dislike",
+    react_note: "Likes and dislikes are anonymous, only the totals are shown. You can change them or take them back with another click.",
   },
 };
 let LANG = store.get("mldc_lang") || ((navigator.language || "").toLowerCase().startsWith("de") ? "de" : "en");

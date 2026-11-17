@@ -35,6 +35,8 @@ const INFO = {
       <ul><li>Abstimmen dürfen alle außer den beiden beteiligten Teams. Die sehen den Stand sofort und dürfen kommentieren.</li>
       <li>Den Stand und die Kommentare siehst du erst, wenn du selbst abgestimmt hast. Vorher nur, wie viele schon abgestimmt haben und wie lange es noch läuft.</li>
       <li>Stimmen sind <b>endgültig</b>. Sonst könnte man den Zwischenstand ansehen und dann taktisch umschwenken.</li>
+      <li><b>Begründung:</b> Bei „klar“ ist ein kurzer Text Pflicht (mindestens 3 Zeichen), bei „deutlich“ ist er freiwillig. Er erscheint zusammen mit deiner Stimme als Kommentar unter deinem Namen.</li>
+      <li><b>Likes und Dislikes</b> unter Kommentaren sind anonym: Gespeichert wird nur ein Schlüssel aus deinem Link und dem Kommentar, keine Person und keine Uhrzeit. Pro Kommentar zählt eine Reaktion von dir. Du kannst sie ändern oder mit erneutem Klick zurücknehmen, auf den eigenen Kommentar geht es nicht. Wer Kommentare sehen darf, darf auch reagieren.</li>
       <li>Die Abstimmung endet nach 24 Stunden oder sobald alle abgestimmt haben. Sie ist ein Meinungsbild, kein Veto.</li></ul>
       <h3>So wird ausgewertet</h3>${INFO.de.short}
       <p>Nötiger Vorsprung bei 14 Stimmberechtigten:</p>
@@ -74,6 +76,8 @@ const INFO = {
       <ul><li>Everyone except the two teams involved can vote. They see the standing right away and can comment.</li>
       <li>You only see the standing and comments after you've voted. Before that, just how many have voted and the time left.</li>
       <li>Votes are <b>final</b>, otherwise you could peek at the standing and then switch tactically.</li>
+      <li><b>Reason:</b> for “clearly” a short text is required (at least 3 characters), for “solidly” it's optional. It appears with your vote as a comment under your name.</li>
+      <li><b>Likes and dislikes</b> on comments are anonymous: only a key made from your link and the comment is stored, no person and no timestamp. You get one reaction per comment. You can change it or take it back with another click, but not on your own comment. Whoever can see comments can react.</li>
       <li>Voting ends after 24 hours or once everyone has voted. It's a poll of opinion, not a veto.</li></ul>
       <h3>How it's evaluated</h3>${INFO.en.short}
       <p>Lead needed with 14 eligible voters:</p>

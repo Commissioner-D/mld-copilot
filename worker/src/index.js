@@ -44,6 +44,7 @@ async function body(req) {
   try { return await req.json(); } catch { throw new HttpError(400, "invalid_json"); }
 }
 
+const TEST_TRADE_ID = 9990001;     // Test-Trade (kein Fleaflicker-Trade)
 const leagueId = env => Number(env.LEAGUE_ID);
 const tradeHours = env => Number(env.TRADE_HOURS || 72);
 
@@ -54,14 +55,17 @@ async function flea(path) {
 }
 
 // ---------- Auth ----------
+const TOKENS = new WeakMap();      // Manager-Objekt -> Roh-Token, nur fuer die Reaktions-Schluessel, wird nie ausgegeben
 async function currentManager(env, req) {
   const h = req.headers.get("Authorization") || "";
   const tok = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
   if (!tok) return null;
   const m = await env.DB.prepare("SELECT * FROM managers WHERE token_hash = ? AND active = 1 AND league_id = ?")
     .bind(await sha256(tok), leagueId(env)).first();
+  if (m) TOKENS.set(m, tok);
   return m || null;
 }
+const reactKey = (me, commentId) => sha256(`react:${TOKENS.get(me) || ""}:${commentId}`);
 
 function requireAdmin(env, req) {
   if (!env.ADMIN_KEY) throw new HttpError(503, "admin_not_configured");
@@ -292,7 +296,7 @@ async function tradeView(env, t, me, managers, { withComments = false, ctx = nul
   const myVote = me ? votes.find(v => v.manager_id === me.id) : null;
   const canSee = !!me && (isParticipant || !!myVote || closed);
   const view = {
-    id: t.id, league_id: t.league_id, status: t.status, description: t.description, sides,
+    id: t.id, league_id: t.league_id, status: t.status, description: t.description, sides, test: !!t.only_for,
     size: size ? { cls: size.cls, unrated: size.unrated } : null,      // Zahlen nur im Admin
     opened_at: t.opened_at, closes_at: t.closes_at, closed, closed_at: t.closed_at,
     eligible: voters.length, voted: votes.length,
@@ -308,7 +312,7 @@ async function tradeView(env, t, me, managers, { withComments = false, ctx = nul
       ballots: votes.map(v => ({ value: v.value, name: byId[v.manager_id]?.owner_name || byId[v.manager_id]?.team_name || "?",
                                  team: byId[v.manager_id]?.team_name || "?" })),
     };
-    if (withComments) view.comments = await listComments(env, "trade", t.id, false, managers);
+    if (withComments) view.comments = await listComments(env, "trade", t.id, false, managers, me);
   }
   return view;
 }
@@ -347,18 +351,53 @@ async function pollView(env, p, me, managers, { withComments = false } = {}) {
         name: byId[v.manager_id]?.owner_name || byId[v.manager_id]?.team_name || "?" }));
     }
   }
-  if (withComments && view.me?.can_comment) view.comments = await listComments(env, "poll", p.id, !!p.anonymous, managers);
+  if (withComments && view.me?.can_comment) view.comments = await listComments(env, "poll", p.id, !!p.anonymous, managers, me);
   return view;
 }
 
 // ---------- Kommentare ----------
-async function listComments(env, target, id, anonymous, managers) {
+// Likes/Dislikes: gespeichert wird nur ein Schluessel (Token + Kommentar) mit +1/-1, keine Person, keine Zeit.
+// "my" ist die eigene Reaktion (-1, 0, 1), nur fuer den Abrufenden berechenbar.
+async function listComments(env, target, id, anonymous, managers, me = null) {
   const { results } = await env.DB.prepare(
-    "SELECT id, manager_id, body, created_at FROM comments WHERE target = ? AND target_id = ? AND deleted = 0 ORDER BY created_at")
+    `SELECT c.id, c.manager_id, c.body, c.created_at, c.vote_value,
+            COALESCE(r.likes, 0) AS likes, COALESCE(r.dislikes, 0) AS dislikes
+     FROM comments c LEFT JOIN (SELECT comment_id, SUM(value = 1) AS likes, SUM(value = -1) AS dislikes
+                                FROM comment_reactions GROUP BY comment_id) r ON r.comment_id = c.id
+     WHERE c.target = ? AND c.target_id = ? AND c.deleted = 0 ORDER BY c.created_at, c.id`)
     .bind(target, id).all();
+  const mine = {};
+  if (me && results.length && TOKENS.has(me)) {
+    const keys = Object.fromEntries(await Promise.all(results.map(async c => [await reactKey(me, c.id), c.id])));
+    const list = Object.keys(keys);
+    for (let i = 0; i < list.length; i += 50) {
+      const part = list.slice(i, i + 50);
+      const { results: rows } = await env.DB.prepare(
+        `SELECT key, value FROM comment_reactions WHERE key IN (${part.map(() => "?").join(",")})`).bind(...part).all();
+      for (const r of rows) mine[keys[r.key]] = r.value;
+    }
+  }
   const byId = Object.fromEntries(managers.map(m => [m.id, m]));
-  return results.map(c => ({ id: c.id, body: c.body, created_at: c.created_at,
+  return results.map(c => ({ id: c.id, body: c.body, created_at: c.created_at, vote_value: c.vote_value,
+    likes: c.likes, dislikes: c.dislikes, my: mine[c.id] || 0,
+    mine: !!me && !!c.manager_id && c.manager_id === me.id,
     name: anonymous || !c.manager_id ? null : byId[c.manager_id]?.owner_name || byId[c.manager_id]?.team_name || "?" }));
+}
+
+// Darf der Manager die Kommentare dieses Ziels sehen (und damit darauf reagieren)? Gleiche Regel wie beim Kommentieren.
+async function canSeeComments(env, target, id, me, managers) {
+  const L = leagueId(env);
+  if (target === "trade") {
+    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND (only_for IS NULL OR only_for = ?)").bind(Number(id), L, me.id).first();
+    if (!t) throw new HttpError(404, "not_found");
+    return !!(await tradeView(env, t, me, managers)).results;
+  }
+  if (target === "poll") {
+    const p = await env.DB.prepare("SELECT * FROM polls WHERE id = ? AND league_id = ?").bind(Number(id), L).first();
+    if (!p) throw new HttpError(404, "not_found");
+    return !!(await pollView(env, p, me, managers)).me?.can_comment;
+  }
+  throw new HttpError(400, "invalid_target");
 }
 
 // ---------- Routen ----------
@@ -394,27 +433,36 @@ async function route(req, env, ctx) {
     return json(me ? { team_id: me.team_id, team_name: me.team_name, owner_name: me.owner_name } : null);
 
   if (path === "/api/trades" && M === "GET") {
-    const { results } = await env.DB.prepare("SELECT * FROM trades WHERE league_id = ? AND hidden = 0 ORDER BY opened_at DESC LIMIT 50").bind(L).all();
+    const { results } = await env.DB.prepare("SELECT * FROM trades WHERE league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?) ORDER BY opened_at DESC LIMIT 50").bind(L, me ? me.id : -1).all();
     const ctx = await leagueCtx(env), vals = await getValues(env);
     return json(await Promise.all(results.map(t => tradeView(env, t, me, managers, { ctx, vals }))));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)$/)) && M === "GET") {
-    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0").bind(Number(m[1]), L).first();
+    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?)").bind(Number(m[1]), L, me ? me.id : -1).first();
     if (!t) throw new HttpError(404, "not_found");
     return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env), vals: await getValues(env) }));
   }
   if ((m = path.match(/^\/api\/trades\/(\d+)\/vote$/)) && M === "POST") {
     if (!me) throw new HttpError(401, "token_required");
-    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0").bind(Number(m[1]), L).first();
+    const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND hidden = 0 AND (only_for IS NULL OR only_for = ?)").bind(Number(m[1]), L, me ? me.id : -1).first();
     if (!t) throw new HttpError(404, "not_found");
     const v = await tradeView(env, t, me, managers);
     if (v.closed) throw new HttpError(409, "closed");
     if (v.me.participant) throw new HttpError(403, "participant");
     if (v.me.vote !== null) throw new HttpError(409, "already_voted");
-    const { value } = await body(req);
+    const { value, text } = await body(req);
     if (!Number.isInteger(value) || value < -3 || value > 3) throw new HttpError(400, "invalid_value");
-    await env.DB.prepare("INSERT INTO trade_votes (trade_id, manager_id, value, created_at) VALUES (?, ?, ?, ?)")
-      .bind(t.id, me.id, value, now()).run();
+    // Begruendung: bei "klar" (+-3) Pflicht (mind. 3 Zeichen, Laenge sonst egal), bei "deutlich" (+-2) freiwillig,
+    // darunter wird ein mitgesendeter Text nicht gespeichert. Sie erscheint als normaler Kommentar unter dem Namen.
+    const clean = String(text ?? "").trim().slice(0, 1000);
+    if (Math.abs(value) === 3 && clean.length < 3) throw new HttpError(400, "statement_required");
+    const stmt = Math.abs(value) >= 2 && clean ? clean : null;
+    const t0 = now();
+    const ops = [env.DB.prepare("INSERT INTO trade_votes (trade_id, manager_id, value, created_at) VALUES (?, ?, ?, ?)")
+      .bind(t.id, me.id, value, t0)];
+    if (stmt) ops.push(env.DB.prepare("INSERT INTO comments (target, target_id, manager_id, body, created_at, vote_value) VALUES ('trade', ?, ?, ?, ?, ?)")
+      .bind(t.id, me.id, stmt, t0, value));
+    await env.DB.batch(ops);          // Stimme und Begruendung zusammen oder gar nicht
     return json(await tradeView(env, t, me, managers, { withComments: true, ctx: await leagueCtx(env), vals: await getValues(env) }));
   }
 
@@ -456,7 +504,7 @@ async function route(req, env, ctx) {
     if (!clean) throw new HttpError(400, "empty");
     let anonymous = false;
     if (target === "trade") {
-      const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ?").bind(Number(id), L).first();
+      const t = await env.DB.prepare("SELECT * FROM trades WHERE id = ? AND league_id = ? AND (only_for IS NULL OR only_for = ?)").bind(Number(id), L, me.id).first();
       if (!t) throw new HttpError(404, "not_found");
       const v = await tradeView(env, t, me, managers);
       if (!v.results) throw new HttpError(403, "vote_first");
@@ -470,6 +518,24 @@ async function route(req, env, ctx) {
     await env.DB.prepare("INSERT INTO comments (target, target_id, manager_id, body, created_at) VALUES (?, ?, ?, ?, ?)")
       .bind(target, Number(id), anonymous ? null : me.id, clean, now()).run();
     return json({ ok: true });
+  }
+
+  // Anonymes Like (+1) / Dislike (-1), 0 nimmt die Reaktion zurueck. Aenderbar, pro Person und Kommentar nur eine.
+  // Nicht auf den eigenen Kommentar.
+  if ((m = path.match(/^\/api\/comments\/(\d+)\/react$/)) && M === "POST") {
+    if (!me) throw new HttpError(401, "token_required");
+    const c = await env.DB.prepare("SELECT id, target, target_id, manager_id FROM comments WHERE id = ? AND deleted = 0").bind(Number(m[1])).first();
+    if (!c) throw new HttpError(404, "not_found");
+    const { value } = await body(req);
+    if (value !== 1 && value !== -1 && value !== 0) throw new HttpError(400, "invalid_value");
+    if (c.manager_id && c.manager_id === me.id) throw new HttpError(403, "own_comment");
+    if (!(await canSeeComments(env, c.target, c.target_id, me, managers))) throw new HttpError(403, "vote_first");
+    const key = await reactKey(me, c.id);
+    if (value === 0) await env.DB.prepare("DELETE FROM comment_reactions WHERE key = ?").bind(key).run();
+    else await env.DB.prepare(`INSERT INTO comment_reactions (key, comment_id, value) VALUES (?, ?, ?)
+                               ON CONFLICT (key) DO UPDATE SET value = excluded.value`).bind(key, c.id, value).run();
+    const r = await env.DB.prepare("SELECT COALESCE(SUM(value = 1), 0) AS likes, COALESCE(SUM(value = -1), 0) AS dislikes FROM comment_reactions WHERE comment_id = ?").bind(c.id).first();
+    return json({ ok: true, likes: r.likes, dislikes: r.dislikes, my: value });
   }
 
   // ---------- Admin ----------
@@ -533,10 +599,37 @@ async function route(req, env, ctx) {
               opened, opened + tradeHours(env) * 3600e3).run();
       return json({ ok: true });
     }
+    // Test-Trade: gibt es bei Fleaflicker nicht, nur fuer einen Manager sichtbar. Erneutes Anlegen setzt ihn zurueck.
+    if (a === "/trades/test" && M === "POST") {
+      const { manager_id } = await body(req);
+      const mgr = await env.DB.prepare("SELECT id FROM managers WHERE id = ? AND league_id = ?").bind(Number(manager_id), L).first();
+      if (!mgr) throw new HttpError(404, "not_found");
+      const sides = [
+        { team_id: null, team_name: "Team Testadler", players: [{ fl_id: null, name: "Testi Receiver", pos: "WR", team: "TST" }], picks: [{ season: new Date().getUTCFullYear() + 1, round: 1, orig: "Team Testadler", from: null }] },
+        { team_id: null, team_name: "Team Probelauf", players: [{ fl_id: null, name: "Probe Linebacker", pos: "LB", team: "TST" }], picks: [] },
+      ];
+      const t0 = now();
+      const old = await env.DB.prepare("SELECT id FROM comments WHERE target = 'trade' AND target_id = ?").bind(TEST_TRADE_ID).all();
+      const ops = [
+        ...old.results.map(c => env.DB.prepare("DELETE FROM comment_reactions WHERE comment_id = ?").bind(c.id)),
+        env.DB.prepare("DELETE FROM comments WHERE target = 'trade' AND target_id = ?").bind(TEST_TRADE_ID),
+        env.DB.prepare("DELETE FROM trade_votes WHERE trade_id = ?").bind(TEST_TRADE_ID),
+        env.DB.prepare("DELETE FROM trades WHERE id = ?").bind(TEST_TRADE_ID),
+        env.DB.prepare(`INSERT INTO trades (id, league_id, status, description, sides, team_a, team_b, opened_at, closes_at, only_for)
+                        VALUES (?, ?, NULL, ?, ?, -1, -2, ?, ?, ?)`)
+          .bind(TEST_TRADE_ID, L, "TEST-TRADE: gibt es bei Fleaflicker nicht, nur für dich sichtbar", JSON.stringify(sides), t0, t0 + 7 * 86400e3, mgr.id),
+      ];
+      // Beispiel-Kommentare ohne Absender, damit man Likes/Dislikes ausprobieren kann
+      [[-3, "[Test] Testi Receiver plus ein 1st ist viel mehr wert als ein Linebacker."], [2, "[Test] Der Linebacker ist fast so gut, ich sehe es eher bei Probelauf."], [0, "[Test] Passt für beide."]]
+        .forEach(([v, text], i) => ops.push(env.DB.prepare("INSERT INTO comments (target, target_id, manager_id, body, created_at, vote_value) VALUES ('trade', ?, NULL, ?, ?, ?)")
+          .bind(TEST_TRADE_ID, text, t0 + i, v)));
+      await env.DB.batch(ops);
+      return json({ ok: true, id: TEST_TRADE_ID });
+    }
     if ((m = a.match(/^\/trades\/(\d+)$/)) && M === "POST") {
       const { hidden, extend_hours, close, resize } = await body(req);
-      if (resize) await env.DB.prepare("UPDATE trades SET size = NULL WHERE id = ?").bind(id).run();   // beim naechsten Anzeigen neu
       const id = Number(m[1]);
+      if (resize) await env.DB.prepare("UPDATE trades SET size = NULL WHERE id = ?").bind(id).run();   // beim naechsten Anzeigen neu
       if (hidden !== undefined) await env.DB.prepare("UPDATE trades SET hidden = ? WHERE id = ?").bind(hidden ? 1 : 0, id).run();
       if (extend_hours) await env.DB.prepare("UPDATE trades SET closes_at = closes_at + ?, closed_at = NULL WHERE id = ?").bind(Number(extend_hours) * 3600e3, id).run();
       if (close) await env.DB.prepare("UPDATE trades SET closed_at = ? WHERE id = ? AND closed_at IS NULL").bind(now(), id).run();

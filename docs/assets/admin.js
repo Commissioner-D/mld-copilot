@@ -6,6 +6,7 @@ const A = {
     link: "Link", new_link: "Neuer Link", link_note: "Nur jetzt sichtbar. Ein neuer Link macht den alten ungültig.",
     size: "Tragweite", resize: "Tragweite neu", resize_t: "Mit aktuellen Werten neu berechnen", copy: "Kopieren", copied: "Kopiert", whatsapp: "Per WhatsApp", save: "Speichern",
     msg: (name, link) => `Servus ${name}! Dein persönlicher Link für den MLD-Copilot (Trade-Abstimmungen & Umfragen). Nicht weitergeben:\n${link}`,
+    test_trade: "Test-Trade anlegen / zurücksetzen", test_for: "sichtbar nur für", test_done: "Test-Trade bereit",
     trades: "Trades", check: "Jetzt auf neue Trades prüfen", checked: r => `${r.added} neu, ${r.updated} aktualisiert`,
     recent: "Abgeschlossene Trades aus Fleaflicker", import: "Zur Abstimmung", imported: "übernommen",
     votes: "Stimmen", close: "Beenden", extend: "+24 h", hide: "Ausblenden", show: "Einblenden",
@@ -25,6 +26,7 @@ const A = {
     link: "Link", new_link: "New link", link_note: "Shown only now. A new link invalidates the old one.",
     size: "Size", resize: "Recalc size", resize_t: "Recalculate with current values", copy: "Copy", copied: "Copied", whatsapp: "Via WhatsApp", save: "Save",
     msg: (name, link) => `Hey ${name}! Your personal MLD-Copilot link (trade votes & polls). Don't share it:\n${link}`,
+    test_trade: "Create / reset test trade", test_for: "visible only to", test_done: "Test trade ready",
     trades: "Trades", check: "Check for new trades now", checked: r => `${r.added} new, ${r.updated} updated`,
     recent: "Completed trades from Fleaflicker", import: "Open vote", imported: "imported",
     votes: "votes", close: "Close", extend: "+24 h", hide: "Hide", show: "Show",
@@ -76,6 +78,9 @@ async function render() {
 
   <div class="card"><div class="card-head"><h3>${a("trades")}</h3><button class="btn small" id="check">${a("check")}</button></div>
   <div class="card-body"><div class="meta" id="checkres"></div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 10px"><span class="meta">${a("test_for")}</span>
+    <select id="testmgr">${mgrs.filter(m => m.active).map(m => `<option value="${m.id}"${m.team_id === 1476731 ? " selected" : ""}>${esc(m.team_name)}</option>`).join("")}</select>
+    <button class="btn small" id="mktest">${a("test_trade")}</button></div>
   <div class="table-wrap"><table>${trades.map(tr => `<tr data-tid="${tr.id}"><td>${esc(tr.description || tr.id)}<div class="meta">${fmtDate(tr.opened_at)} · ${tr.voted} ${a("votes")} · ${tr.size ? `${a("size")} ${tr.size.v.toFixed(2)} (${tr.size.sides.map(x => x.toFixed(2)).join(" / ")})${tr.size.unrated.length ? " · ? " + esc(tr.size.unrated.join(", ")) : ""} · ` : ""}${tr.closed_at || Date.now() > tr.closes_at ? a("closed") : countdown(tr.closes_at)}</div></td>
     <td style="white-space:nowrap"><button class="btn small" data-act="extend">${a("extend")}</button>
     <button class="btn small" data-act="close">${a("close")}</button>
@@ -131,6 +136,10 @@ async function render() {
       lr.querySelector("[data-copy]").onclick = async e => { await navigator.clipboard.writeText(link); e.target.textContent = a("copied"); };
     };
   });
+  document.getElementById("mktest").onclick = async () => {
+    await adm("POST", "/trades/test", { manager_id: Number(document.getElementById("testmgr").value) });
+    document.getElementById("checkres").textContent = a("test_done"); render();
+  };
   document.getElementById("check").onclick = async () => {
     const r = await adm("POST", "/trades/check"); document.getElementById("checkres").textContent = a("checked")(r);
     if (r.added) render();
