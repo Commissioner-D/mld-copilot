@@ -30,6 +30,13 @@ const INFO = {
       <li><b>Urteil:</b> Reicht der Vorsprung, gibt es eine <i>Tendenz</i>, ist er sehr groß, einen <i>klaren Vorteil</i>. Sonst: <i>kein klares Bild</i>.</li>
       <li><b>Stärke:</b> die mittlere Stimme der Mehrheitsseite (leicht/deutlich/klar). Einzelne Ausreißer verschieben sie nicht.</li></ol>`,
     page: () => `<h2>So funktioniert der MLD-Copilot</h2>
+      <h3>Draft-Pick-Tracker <span class="pill-test">Test</span></h3>
+      <p>Wo landen die Picks im nächsten Rookie-Draft? Links der Verlauf der Saison, in der Mitte die Reihenfolge nach der letzten fertigen Runde, rechts die Prognose bis zum Draft.</p>
+      <ul><li><b>Reihenfolge nach Regel 9.2.1:</b> Teams ohne Playoffs nach Optimum-Punkten der Regular Season (wenigste Punkte = erster Pick). Playoff-Teams kommen danach, geordnet nach der Runde, in der sie ausscheiden. Die gestrichelte Linie trennt die beiden Bereiche.</li>
+      <li><b>Der Fächer</b> zeigt, wo ein Team landen kann: je breiter, desto offener. Dunkel ist der wahrscheinlichste Bereich, ganz hell sind seltene Ausgänge. Berechnet aus 4.000 simulierten Restsaisons mit dem echten Spielplan.</li>
+      <li>Ist der Platz eines Teams fix, endet die Linie in einem Punkt.</li>
+      <li>Aktualisiert jeden Dienstag um 8:00. Trades, Verletzungen und Aufstellungen kennt die Prognose nicht, sie ist eine grobe Orientierung.</li></ul>
+      <div id="dpt"></div>
       <h3>Trade-Abstimmungen</h3>
       <p>Jeder neue Trade wird automatisch zur Abstimmung gestellt (stündlicher Check). Die Frage lautet: <i>Wer hat aus Sicht seines eigenen Teams den besseren Deal gemacht?</i> Es gibt 7 Stufen von „Team A klar“ über „fair“ bis „Team B klar“. Trades mit drei oder mehr Teams werden derzeit noch nicht übernommen.</p>
       <ul><li>Abstimmen dürfen alle außer den beiden beteiligten Teams. Die sehen den Stand sofort und dürfen kommentieren.</li>
@@ -71,6 +78,13 @@ const INFO = {
       <li><b>Verdict:</b> a big enough lead gives a <i>leaning</i>, a very big one a <i>clear edge</i>. Otherwise: <i>no clear picture</i>.</li>
       <li><b>Strength:</b> the middle vote of the majority side (slight/solid/clear). Single outliers don't move it.</li></ol>`,
     page: () => `<h2>How MLD-Copilot works</h2>
+      <h3>Draft pick tracker <span class="pill-test">Test</span></h3>
+      <p>Where will the picks land in the next rookie draft? Left: how the season went. Middle: the order after the last completed week. Right: the outlook through the draft.</p>
+      <ul><li><b>Order per rule 9.2.1:</b> non-playoff teams by regular-season optimum points (fewest points = first pick). Playoff teams follow, ordered by the round they're knocked out. The dashed line separates the two groups.</li>
+      <li><b>The fan</b> shows where a team can land: the wider, the more open. Dark is the most likely range, very light are rare outcomes. Based on 4,000 simulated rest-of-seasons with the real schedule.</li>
+      <li>Once a team's spot is fixed, its line ends in a dot.</li>
+      <li>Updated every Tuesday at 8:00 (Vienna). The outlook doesn't know about trades, injuries or lineups, so treat it as a rough guide.</li></ul>
+      <div id="dpt"></div>
       <h3>Trade votes</h3>
       <p>Every new trade is put to a vote automatically (hourly check). The question: <i>Who got the better deal from their own team's point of view?</i> There are 7 steps from "Team A clearly" via "fair" to "Team B clearly". Trades with three or more teams aren't picked up yet.</p>
       <ul><li>Everyone except the two teams involved can vote. They see the standing right away and can comment.</li>

@@ -387,7 +387,7 @@ async function router() {
     if ((m = h.match(/^#\/trade\/(\d+)/))) { renderNav("trades"); await showTrade(m[1]); }
     else if ((m = h.match(/^#\/poll\/(\d+)/))) { renderNav("polls"); await showPoll(m[1]); }
     else if (h.startsWith("#/polls")) { renderNav("polls"); await showList("polls"); }
-    else if (h.startsWith("#/info")) { renderNav("info"); $main.innerHTML = `<div class="card info"><div class="card-body">${INFO[LANG].page()}</div></div>`; }
+    else if (h.startsWith("#/info")) { renderNav("info"); $main.innerHTML = `<div class="card info"><div class="card-body">${INFO[LANG].page()}</div></div>`; renderDraftTracker(); }
     else { renderNav("trades"); await showList("trades"); }
   } catch (e) {
     $main.innerHTML = `<div class="notice err">${esc(errText(e))}</div>`;

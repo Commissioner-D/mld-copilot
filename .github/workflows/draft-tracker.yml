@@ -1,0 +1,31 @@
+name: Draft-Pick-Tracker
+
+on:
+  schedule:
+    - cron: "0 7 * * 2"       # dienstags 07:00 UTC = 08:00 Wien (Winterzeit), nach Monday Night
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [tools/build_draft_tracker.py, .github/workflows/draft-tracker.yml]
+
+permissions:
+  contents: write
+
+concurrency: draft-tracker
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python tools/build_draft_tracker.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898732+github-actions[bot]@users.noreply.github.com"
+          git add docs/data/draft_tracker.json
+          git diff --cached --quiet && { echo "unveraendert"; exit 0; }
+          git commit -m "Draft-Pick-Tracker aktualisiert"
+          git pull --rebase --autostash && git push
