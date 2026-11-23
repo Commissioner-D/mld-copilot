@@ -151,3 +151,4 @@ vite.config.ts.timestamp-*
 # Cloudflare
 .wrangler/
 .dev.vars
+__pycache__/
