@@ -15,6 +15,7 @@ REG_WEEKS = 14            # Regel 5: 14 Runden Regular Season
 PO_WEEKS = (15, 16, 17)   # Wildcard, Halbfinale, Finale
 N_SIM = 4000
 QUANT = (.025, .1, .25, .5, .75, .9, .975)
+P_MIN = 0.005             # aeusserstes Band: alle Slots, die in mind. 0,5 % der Laeufe vorkommen
 FLEA = "https://www.fleaflicker.com/api"
 UA = {"User-Agent": "mld-copilot/1.0"}
 NOW = datetime.now(timezone.utc)
@@ -238,6 +239,11 @@ def main():
            "reg_weeks": REG_WEEKS, "cols": cols, "quantiles": list(QUANT), "teams": []}
     for t in ids:
         q = [[quant(c, p) for p in QUANT] for c in sims[t]]
+        # Aeusseres Band nicht per Quantil (schneidet bei jedem Team 2,5 % ab, dann kann der
+        # Erste "noch Zweiter werden", aber niemand mehr Erster), sondern ueber die Haeufigkeit.
+        for col, c in zip(q, sims[t]):
+            seen = [v for v in set(c) if c.count(v) >= P_MIN * len(c)]
+            col[0], col[6] = min(seen + [col[1]]), max(seen + [col[5]])
         fixed = all(len(set(c)) == 1 for c in sims[t])
         out["teams"].append({"id": t, "name": teams[t], "short": SHORT.get(teams[t], teams[t]),
                              "hist": hist[t], "q": q, "fixed": fixed,
