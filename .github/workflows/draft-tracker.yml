@@ -2,7 +2,7 @@ name: Draft-Pick-Tracker
 
 on:
   schedule:
-    - cron: "0 7 * * 2"       # dienstags 07:00 UTC = 08:00 Wien (Winterzeit), nach Monday Night
+    - cron: "37 6 * * 2"      # dienstags 06:37 UTC = 07:37 Wien (Winterzeit); nicht zur vollen Stunde, damit es bis 8:00 sicher fertig ist
   workflow_dispatch:
   push:
     branches: [main]
