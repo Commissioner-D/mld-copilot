@@ -69,15 +69,35 @@ def fetch():
                           "playoff": bool(g.get("isPlayoffs")) and not g.get("isConsolation")})
         weeks[w] = games
         time.sleep(0.4)
-    # Optimum je Team und abgeschlossener Regular-Season-Woche (aus dem Boxscore)
+    # Optimum je Team und abgeschlossener Regular-Season-Woche (aus dem Boxscore).
+    # Fleaflicker setzt isFinalScore erst Tage spaeter; fertig ist eine Woche, sobald
+    # alle NFL-Spiele aller Spieler im Boxscore FINAL_SCORE sind.
     opt = defaultdict(dict)
-    done = [w for w in range(1, REG_WEEKS + 1) if weeks[w] and all(g["final"] for g in weeks[w])]
-    for w in done:
+    done = []
+    for w in range(1, REG_WEEKS + 1):
+        if not weeks[w]:
+            break
+        statuses, wopt = set(), {}
         for g in weeks[w]:
             bx = api(f"FetchLeagueBoxscore?sport=NFL&league_id={LEAGUE_ID}&fantasy_game_id={g['id']}&scoring_period={w}")
             for side, key in (("a", "pointsAway"), ("h", "pointsHome")):
-                opt[g[side]][w] = val(val(((bx.get(key) or {}).get("total") or {}).get("optimum"))) or 0.0
+                wopt[g[side]] = val(val(((bx.get(key) or {}).get("total") or {}).get("optimum"))) or 0.0
+            if not g["final"]:
+                for grp in bx.get("lineups") or []:
+                    for sl in grp.get("slots") or []:
+                        for side in ("away", "home"):
+                            for rg in ((sl.get(side) or {}).get("requestedGames") or []):
+                                if rg.get("game"):
+                                    statuses.add(rg["game"].get("status"))
             time.sleep(0.4)
+        if all(g["final"] for g in weeks[w]) or (statuses and statuses <= {"FINAL_SCORE"}):
+            done.append(w)
+            for t, o in wopt.items():
+                opt[t][w] = o
+            for g in weeks[w]:
+                g["final"] = True
+        else:
+            break
     return teams, div, weeks, done, opt
 
 
