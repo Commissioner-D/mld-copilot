@@ -1,0 +1,34 @@
+deploy: 2026-11-25T05:32:42Z
+url: https://mld-copilot.commissioner-d.workers.dev
+--- health
+{"ok":true,"league_id":294292,"admin":true,"test_mode":false,"last_trade_check":1795583279643,"last_trade_error":"2026-11-22T13:08:00.677Z fleaflicker_403","params":{"w":0.5,"zClear":1.96,"zTendency":1.28},"fleaflicker":{"ok":true,"league":"Major League Dynasty","under_review":[]}}
+--- trades
+[{"id":10607524,"league_id":294292,"status":"TRADE_STATUS_UNDER_REVIEW","description":"1 Pick for Rodgers","sides":[{"team_id":1476731,"team_name":"Tegetthoff Admirals","players":[],"picks":[{"season":2028,"round":4,"orig":"Vienna BBB","from":null,"outlook":null}]},{"team_id":1525398,"team_name":"Vienna BBB","players":[{"fl_id":3452,"name":"Aaron Rodgers","pos":"QB","team":"PIT","info":{"age":43,"
+--- cors
+access-control-allow-origin: https://commissioner-d.github.io
+--- subdomain
+Subdomain: commissioner-d
+--- deploy.log
+
+ ⛅️ wrangler 4.152.0 (update available 4.168.0)
+───────────────────────────────────────────────
+
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+Total Upload: 42.98 KiB / gzip: 11.78 KiB
+Your Worker has access to the following bindings:
+Binding                                                                  Resource                  
+env.DB (mld-copilot)                                                     D1 Database               
+env.LEAGUE_ID ("294292")                                                 Environment Variable      
+env.TRADE_HOURS ("24")                                                   Environment Variable      
+env.SEASON_WEEKS ("17")                                                  Environment Variable      
+env.TEST_MODE ("0")                                                      Environment Variable      
+env.ALLOWED_ORIGINS ("https://commissioner-d.github.io")                 Environment Variable      
+env.LEAGUE_DATA_URL ("https://raw.githubusercontent.com/Com...")         Environment Variable      
+env.LEAGUE_DATA_LEAGUE ("294292")                                        Environment Variable      
+env.VALUES_URL ("https://raw.githubusercontent.com/Com...")              Environment Variable      
+
+Uploaded mld-copilot (5.20 sec)
+Deployed mld-copilot triggers (2.52 sec)
+  https://mld-copilot.commissioner-d.workers.dev
+  schedule: 7 * * * *
+Current Version ID: 0478fc86-9f35-431a-9c52-da269480d0ae
