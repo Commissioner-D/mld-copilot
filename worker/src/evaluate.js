@@ -54,6 +54,9 @@ export function evaluatePoll(poll, votes, ballots, eligible) {
     const abstain = choices.filter(c => c === "abstain").length;
     const quorumMet = !poll.quorum || ballots >= poll.quorum;
     const base = yes + no;
+    if (poll.advisory)                      // Stimmungsbild: nur Tendenz, keine Entscheidung
+      return { kind: "yesno", yes, no, abstain, ballots, eligible, quorum_met: true,
+               outcome: yes > no ? "lean_yes" : no > yes ? "lean_no" : "tie" };
     let passed;
     if (poll.threshold === "two_thirds") passed = base > 0 && yes * 3 >= base * 2;
     else if (poll.threshold === "unanimous") passed = yes > 0 && no === 0;
@@ -62,9 +65,16 @@ export function evaluatePoll(poll, votes, ballots, eligible) {
              outcome: !quorumMet ? "no_quorum" : passed ? "accepted" : "rejected" };
   }
   const opts = JSON.parse(poll.options || "[]");
+  const subs = JSON.parse(poll.suboptions || "null");
   const counts = opts.map(() => 0);
-  for (const c of choices) for (const i of (Array.isArray(c) ? c : [c])) if (counts[i] !== undefined) counts[i]++;
+  const subcounts = subs ? subs.map(x => x ? x.map(() => 0) : null) : null;
+  for (const c of choices) {
+    if (poll.kind === "single" && Array.isArray(c)) {           // [Hauptoption, Unteroption]
+      if (counts[c[0]] !== undefined) counts[c[0]]++;
+      if (subcounts?.[c[0]]?.[c[1]] !== undefined) subcounts[c[0]][c[1]]++;
+    } else for (const i of (Array.isArray(c) ? c : [c])) if (counts[i] !== undefined) counts[i]++;
+  }
   const max = Math.max(0, ...counts);
   const winners = max > 0 ? counts.map((n, i) => n === max ? i : -1).filter(i => i >= 0) : [];
-  return { kind: poll.kind, counts, ballots, eligible, winners };
+  return { kind: poll.kind, counts, subcounts, ballots, eligible, winners };
 }

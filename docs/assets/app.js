@@ -201,12 +201,17 @@ async function showTrade(id) {
 // ---------- Umfragen ----------
 function pollInfo(p) {
   const bits = [p.anonymous ? t("anon") : t("public"), t("vis_" + p.visibility)];
-  if (p.kind === "yesno" && p.threshold) bits.push(t("th_" + p.threshold));
-  if (p.quorum) bits.push(t("quorum", p.quorum));
+  if (p.kind === "yesno" && p.threshold && !p.advisory) bits.push(t("th_" + p.threshold));
+  if (p.quorum && !p.advisory) bits.push(t("quorum", p.quorum));
   if (p.end_yes) bits.push(t("end_yes", p.end_yes));
   if (p.end_no) bits.push(t("end_no", p.end_no));
-  return bits.map(b => `<span class="pill">${esc(b)}</span>`).join(" ");
+  return (p.advisory ? `<span class="pill advisory">${t("advisory")}</span> ` : "") + bits.map(b => `<span class="pill">${esc(b)}</span>`).join(" ");
 }
+
+// Einfachauswahl mit Unteroptionen: Stimme ist i oder [i, j]
+const pollLabel = (p, c) => Array.isArray(c) && p.kind === "single"
+  ? `${p.options[c[0]]} → ${p.suboptions?.[c[0]]?.[c[1]] ?? "?"}`
+  : (Array.isArray(c) ? c : [c]).map(i => p.options[i]).join(", ");
 
 function pollCard(p) {
   const mine = p.me?.voted ? `<span class="pill mine">✓ ${t("you_voted")}</span>` : "";
@@ -224,14 +229,20 @@ function pollVoteHtml(p) {
     inner = `<div class="choices yesno" id="choices">${["yes", "abstain", "no"].map(c =>
       `<button data-c="${c}" class="${sel === c ? "sel" : ""}">${t(c)}</button>`).join("")}</div>`;
   } else if (p.kind === "single") {
-    inner = `<div class="choices" id="choices">${p.options.map((o, i) =>
-      `<button data-c="${i}" class="${sel === i ? "sel" : ""}">${esc(o)}</button>`).join("")}</div>`;
+    const top = Array.isArray(sel) ? sel[0] : sel;
+    inner = `<div class="choices" id="choices">${p.options.map((o, i) => {
+      const subs = p.suboptions?.[i];
+      let h = `<button data-c="${i}" class="${top === i ? "sel" : ""}">${subs ? `<span class="caret">${top === i ? "▾" : "▸"}</span>` : ""}${esc(o)}</button>`;
+      if (subs && top === i) h += `<div class="subchoices"><div class="meta">${t("pick_sub")}</div>${subs.map((so, j) =>
+        `<button data-c="${i}" data-s="${j}" class="${Array.isArray(sel) && sel[1] === j ? "sel" : ""}">${esc(so)}</button>`).join("")}</div>`;
+      return h; }).join("")}</div>`;
   } else {
     const chosen = Array.isArray(sel) ? sel : [];
     inner = `<div class="meta" style="margin-bottom:6px">${t("multi_hint")}</div><div class="choices" id="choices">${p.options.map((o, i) =>
       `<button data-c="${i}" class="${chosen.includes(i) ? "sel" : ""}">${chosen.includes(i) ? "☑" : "☐"} ${esc(o)}</button>`).join("")}</div>`;
   }
-  const ready = sel !== null && !(Array.isArray(sel) && sel.length === 0);
+  const ready = sel !== null && !(Array.isArray(sel) && sel.length === 0)
+    && !(p.kind === "single" && !Array.isArray(sel) && p.suboptions?.[sel]);
   return `<div style="margin-top:14px">${inner}</div>${ready ? confirmHtml() : `<div class="meta" style="margin-top:6px">${t("final_note")}</div>`}`;
 }
 
@@ -246,11 +257,13 @@ function pollResultsHtml(p) {
         `<div class="row"><div>${t(k)}</div><div class="track"><div class="fill" style="width:${100 * n / total}%"></div></div><div class="v">${n}</div></div>`).join("")}</div>`;
   } else {
     const total = Math.max(1, ...r.counts);
+    const bar = (label, n, cls = "") => `<div class="row${cls}"><div>${label}</div><div class="track"><div class="fill" style="width:${100 * n / total}%"></div></div><div class="v">${n}</div></div>`;
     html += `<div class="bars">${p.options.map((o, i) =>
-      `<div class="row"><div>${r.winners.includes(i) ? "★ " : ""}${esc(o)}</div><div class="track"><div class="fill" style="width:${100 * r.counts[i] / total}%"></div></div><div class="v">${r.counts[i]}</div></div>`).join("")}</div>`;
+      bar((r.winners.includes(i) ? "★ " : "") + esc(o), r.counts[i])
+      + (p.suboptions?.[i] && r.subcounts?.[i] ? p.suboptions[i].map((so, j) => bar("↳ " + esc(so), r.subcounts[i][j], " sub")).join("") : "")).join("")}</div>`;
   }
   if (r.voters) {
-    const label = c => p.kind === "yesno" ? t(c) : (Array.isArray(c) ? c : [c]).map(i => p.options[i]).join(", ");
+    const label = c => p.kind === "yesno" ? t(c) : pollLabel(p, c);
     html += `<div class="meta" style="margin-top:10px">${r.voters.map(v => `${esc(v.name)}: ${esc(label(v.choice))}`).join(" · ")}</div>`;
   }
   html += `<div class="meta" style="margin-top:6px">${t("voted_of", r.ballots, r.eligible)}</div>`;
@@ -277,7 +290,8 @@ async function showPoll(id) {
   if (ch) ch.onclick = e => {
     const b = e.target.closest("button[data-c]"); if (!b) return;
     const c = p.kind === "yesno" ? b.dataset.c : Number(b.dataset.c);
-    if (p.kind === "multi") {
+    if (p.kind === "single" && b.dataset.s !== undefined) pending = { kind: "poll", id: p.id, value: [c, Number(b.dataset.s)] };
+    else if (p.kind === "multi") {
       const cur = pending && pending.kind === "poll" && Array.isArray(pending.value) ? pending.value : [];
       const next = cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c].sort((a, b) => a - b);
       pending = { kind: "poll", id: p.id, value: next };

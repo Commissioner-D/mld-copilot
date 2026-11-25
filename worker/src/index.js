@@ -338,6 +338,7 @@ async function pollView(env, p, me, managers, { withComments = false } = {}) {
   const canSee = !!me && (p.visibility === "live" || closed || (p.visibility === "after_vote" && voted));
   const view = {
     id: p.id, title: p.title, body: p.body, kind: p.kind, options: JSON.parse(p.options || "null"),
+    suboptions: JSON.parse(p.suboptions || "null"), advisory: !!p.advisory,
     anonymous: !!p.anonymous, visibility: p.visibility, threshold: p.threshold, quorum: p.quorum,
     end_all_voted: !!p.end_all_voted, end_yes: p.end_yes, end_no: p.end_no, trade_id: p.trade_id,
     opened_at: p.opened_at, closes_at: p.closes_at, closed, closed_at: p.closed_at,
@@ -486,9 +487,14 @@ async function route(req, env, ctx) {
     if (v.me.voted) throw new HttpError(409, "already_voted");
     const { choice } = await body(req);
     const opts = JSON.parse(p.options || "[]");
+    const subs = JSON.parse(p.suboptions || "null");
     const okIdx = i => Number.isInteger(i) && i >= 0 && i < opts.length;
+    // Einfachauswahl: Hauptoption i, bei Unteroptionen [i, j]
+    const okSingle = c => Array.isArray(c)
+      ? c.length === 2 && okIdx(c[0]) && !!subs?.[c[0]] && Number.isInteger(c[1]) && c[1] >= 0 && c[1] < subs[c[0]].length
+      : okIdx(c) && !subs?.[c];
     const valid = p.kind === "yesno" ? ["yes", "no", "abstain"].includes(choice)
-      : p.kind === "single" ? okIdx(choice)
+      : p.kind === "single" ? okSingle(choice)
       : Array.isArray(choice) && choice.length > 0 && choice.every(okIdx) && new Set(choice).size === choice.length;
     if (!valid) throw new HttpError(400, "invalid_choice");
     await env.DB.batch([
@@ -652,18 +658,33 @@ async function route(req, env, ctx) {
       const b = await body(req);
       const kind = ["yesno", "single", "multi"].includes(b.kind) ? b.kind : null;
       if (!kind || !String(b.title || "").trim()) throw new HttpError(400, "invalid_poll");
-      const options = kind === "yesno" ? null : (b.options || []).map(s => String(s).trim()).filter(Boolean);
-      if (options && options.length < 2) throw new HttpError(400, "need_options");
+      // Zeilen mit "-" am Anfang sind Unteroptionen der Zeile darueber (nur Einfachauswahl)
+      let options = null, suboptions = null;
+      if (kind !== "yesno") {
+        options = []; const subs = [];
+        for (const raw of (b.options || [])) {
+          const line = String(raw).trim(); if (!line) continue;
+          const sm = line.match(/^[-–•]\s*(.+)$/);
+          if (sm) {
+            if (kind !== "single" || !options.length) throw new HttpError(400, "invalid_suboptions");
+            (subs[options.length - 1] ||= []).push(sm[1].trim().slice(0, 300));
+          } else { options.push(line.slice(0, 300)); subs.push(null); }
+        }
+        if (options.length < 2) throw new HttpError(400, "need_options");
+        if (subs.some(x => x && x.length < 2)) throw new HttpError(400, "need_two_suboptions");
+        if (subs.some(Boolean)) suboptions = subs;
+      }
       const visibility = ["live", "after_vote", "after_close"].includes(b.visibility) ? b.visibility : "after_vote";
       const opened = now();
       const r = await env.DB.prepare(`INSERT INTO polls (league_id, title, body, kind, options, anonymous, visibility, threshold, quorum,
-            end_all_voted, end_yes, end_no, trade_id, opened_at, closes_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            end_all_voted, end_yes, end_no, trade_id, opened_at, closes_at, suboptions, advisory) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(L, String(b.title).trim().slice(0, 200), b.body ? String(b.body).slice(0, 4000) : null, kind,
               options ? JSON.stringify(options) : null, b.anonymous ? 1 : 0, visibility,
               kind === "yesno" ? (["simple", "two_thirds", "unanimous"].includes(b.threshold) ? b.threshold : "simple") : null,
               b.quorum ? Number(b.quorum) : null, b.end_all_voted === false ? 0 : 1,
               b.end_yes ? Number(b.end_yes) : null, b.end_no ? Number(b.end_no) : null,
-              b.trade_id ? Number(b.trade_id) : null, opened, b.hours ? opened + Number(b.hours) * 3600e3 : null).run();
+              b.trade_id ? Number(b.trade_id) : null, opened, b.hours ? opened + Number(b.hours) * 3600e3 : null,
+              suboptions ? JSON.stringify(suboptions) : null, b.advisory ? 1 : 0).run();
       return json({ ok: true, id: r.meta.last_row_id });
     }
     if ((m = a.match(/^\/polls\/(\d+)\/close$/)) && M === "POST") {

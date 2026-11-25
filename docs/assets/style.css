@@ -259,3 +259,13 @@ a.fl:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .pill-test { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: var(--hl); color: var(--hl-ink); vertical-align: middle; }
 .dpt-scroll { overflow-x: auto; margin: 0 -4px; }
 .dpt { display: block; width: 100%; min-width: 600px; height: auto; font-family: inherit; }
+
+/* Umfrage: Unteroptionen und Stimmungsbild */
+.subchoices { display: grid; gap: 6px; margin: 0 0 4px 22px; padding-left: 10px; border-left: 2px solid var(--accent); }
+.subchoices .meta { margin: 2px 0 0; }
+.choices .caret { width: 12px; color: var(--muted); }
+.bars .row.sub { font-size: 13px; color: var(--muted); }
+.bars .row.sub > div:first-child { padding-left: 14px; }
+.bars .row.sub .fill { opacity: .55; }
+.pill.advisory { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.outcome.lean_yes, .outcome.lean_no, .outcome.tie { color: var(--text, inherit); }
