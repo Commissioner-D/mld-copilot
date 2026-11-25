@@ -12,7 +12,7 @@ const A = {
     votes: "Stimmen", close: "Beenden", extend: "+24 h", hide: "Ausblenden", show: "Einblenden",
     new_poll: "Neue Umfrage", q: "Frage", desc: "Beschreibung (optional)", kind: "Art",
     k_yesno: "Ja / Enthaltung / Nein", k_single: "Eine Option wählen", k_multi: "Mehrere Optionen wählen",
-    options: "Optionen (eine pro Zeile)", opt_hint: "Unteroptionen: Zeile mit „-“ beginnen, sie gehören zur Zeile darüber (nur bei „Eine Option wählen“, mind. 2 pro Gruppe).", advisory: "Stimmungsbild (nicht bindend)", anon: "Anonym", vis: "Ergebnis sichtbar",
+    options: "Optionen (eine pro Zeile)", opt_hint: "Unteroptionen: Zeile mit „-“ beginnen, sie gehören zur Zeile darüber (nur bei „Eine Option wählen“, mind. 2 pro Gruppe).", anon: "Anonym", vis: "Ergebnis sichtbar",
     v_live: "jederzeit", v_after_vote: "nach eigener Stimme", v_after_close: "nach Ende",
     th: "Mehrheit", th_simple: "einfach", th_two_thirds: "2/3", th_unanimous: "einstimmig",
     quorum: "Quorum (Mindestbeteiligung, optional)", hours: "Dauer in Stunden (leer = ohne Limit)",
@@ -32,7 +32,7 @@ const A = {
     votes: "votes", close: "Close", extend: "+24 h", hide: "Hide", show: "Show",
     new_poll: "New poll", q: "Question", desc: "Description (optional)", kind: "Type",
     k_yesno: "Yes / Abstain / No", k_single: "Pick one option", k_multi: "Pick several options",
-    options: "Options (one per line)", opt_hint: "Sub-options: start the line with “-”; they belong to the line above (single choice only, at least 2 per group).", advisory: "Straw poll (not binding)", anon: "Anonymous", vis: "Results visible",
+    options: "Options (one per line)", opt_hint: "Sub-options: start the line with “-”; they belong to the line above (single choice only, at least 2 per group).", anon: "Anonymous", vis: "Results visible",
     v_live: "always", v_after_vote: "after own vote", v_after_close: "after close",
     th: "Majority", th_simple: "simple", th_two_thirds: "2/3", th_unanimous: "unanimous",
     quorum: "Quorum (min. turnout, optional)", hours: "Duration in hours (empty = no limit)",
@@ -105,7 +105,6 @@ async function render() {
       <div><label class="f">${a("end_no")}</label><input type="number" name="end_no" min="1" max="16"></div></div>
     <div class="grid2"><div><label class="f">${a("hours")}</label><input type="number" name="hours" min="1" value="72"></div>
       <div><label class="f">${a("trade_id")}</label><input type="number" name="trade_id"></div></div>
-    <label class="f"><input type="checkbox" name="advisory"> ${a("advisory")}</label>
     <label class="f"><input type="checkbox" name="anonymous"> ${a("anon")}</label>
     <label class="f"><input type="checkbox" name="end_all_voted" checked> ${a("end_all")}</label>
     <div style="margin-top:12px"><button class="btn primary">${a("create")}</button> <span class="meta" id="pres"></span></div>
@@ -173,7 +172,7 @@ async function render() {
     e.preventDefault();
     const num = n => F[n].value ? Number(F[n].value) : null;
     const b = { title: F.title.value, body: F.body.value || null, kind: F.kind.value, visibility: F.visibility.value,
-      anonymous: F.anonymous.checked, advisory: F.advisory.checked, end_all_voted: F.end_all_voted.checked, hours: num("hours"), trade_id: num("trade_id") };
+      anonymous: F.anonymous.checked, end_all_voted: F.end_all_voted.checked, hours: num("hours"), trade_id: num("trade_id") };
     if (b.kind === "yesno") Object.assign(b, { threshold: F.threshold.value, quorum: num("quorum"), end_yes: num("end_yes"), end_no: num("end_no") });
     else b.options = F.options.value.split("\n");
     try { await adm("POST", "/polls", b); render(); }
